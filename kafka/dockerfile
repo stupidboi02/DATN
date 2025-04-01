@@ -1,0 +1,19 @@
+FROM bitnami/kafka:latest
+USER root
+
+RUN apt-get update \
+    && apt-get install -y python3 python3-pip python3-venv\
+    && rm -rf /var/lib/apt/lists/*
+
+#create VM to install library
+RUN python3 -m venv /opt/vm \
+    && /opt/vm/bin/pip install confluent_kafka requests
+
+ENV PATH="/opt/vm/bin:$PATH" 
+
+# USER 1001
+# WORKDIR /var/lib/kafka/
+
+# COPY producer.py .
+
+# CMD ["/opt/vm/bin/python" , "producer.py"]

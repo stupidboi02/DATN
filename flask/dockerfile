@@ -1,0 +1,16 @@
+FROM python:3.9-slim
+
+WORKDIR /opt/flask/code
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+ENV FLASK_APP=app.py
+COPY app.py .
+
+# CMD ["python", "-m" , "flask", "run", "--host=0.0.0.0","--reload"]
+
+# FROM bitnami/spark:3.5
+# WORKDIR /opt/flask/code
+# COPY requirements.txt requirements.txt
+# RUN pip install -r requirements.txt
+# ENV FLASK_APP=app.py
+# COPY app.py .
