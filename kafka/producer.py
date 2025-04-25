@@ -1,8 +1,7 @@
 from confluent_kafka import Producer
-import json
-import requests
-import threading
-import time
+import json,requests, threading, time, sys
+from datetime import datetime
+
 
 config = {
     "bootstrap.servers": "kafka-0:9092,kafka-1:9092,kafka-2:9092",
@@ -32,7 +31,7 @@ def flush(year,month,day):
             end_time0 = time.time()
             print(f"Thời gian gọi API: {end_time0 - start_time0:.2f} giây")
             data = res.json()
-            print(data)
+            # print(data)
             if data['state'] == 'error':
                 break
 
@@ -62,21 +61,8 @@ def flush(year,month,day):
     producer.flush()
 
 if __name__ == "__main__":
-    month = 11
-    for day in range(1,32):
-        flush(2019,month,day)
 
-    days = 31
-    # # number_loop = (days//3) + 1
-    # for day in range(0, days, 3):  
-    #     if day + 1 <= days:
-    #         threading.Thread(target=flush, args=(2019, 10, day + 1)).start()
-    #     if day + 2 <= days:
-    #         threading.Thread(target=flush, args=(2019, 10, day + 2)).start()
-    #     if day + 3 <= days:
-    #         threading.Thread(target=flush, args=(2019, 10, day + 3)).start()
+    date = datetime.strptime(sys.argv[1], "%Y-%m-%d")
+    year, month, day = date.year, date.month, date.day
+    flush(year,month,day)
 
-    # max_workers = 5  # Chỉ chạy tối đa 5 luồng cùng lúc
-    # with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    #     for day in range(1, days + 1):
-    #         executor.submit(flush, 2019, 10, day)

@@ -7,7 +7,7 @@ app = Flask(__name__)
 #     duckdb_file = f"./data/{year}-{month}.duckdb"
 #     file_path = f"./data/{year}-{month}.csv"
 #     con = duckdb.connect(duckdb_file)
-#     con.execute(f"CREATE TABLE IF NOT EXISTS logs AS SELECT * FROM read_csv('{file_path}'))
+#     con.execute(f"CREATE TABLE IF NOT EXISTS logs AS SELECT * FROM read_csv('{file_path}')")
 #     con.execute("CREATE SEQUENCE serial START 1")
 #     con.execute("ALTER TABLE logs ADD COLUMN id BIGINT DEFAULT nextval('serial')")
 #     con.execute("CHECKPOINT")

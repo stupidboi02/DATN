@@ -5,7 +5,7 @@ from pyspark.sql.types import *
 spark = SparkSession.builder \
     .appName("Streaming from Kafka") \
     .config("spark.streaming.stopGracefullyOnShutdown", "true") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.kafka:kafka-clients:3.5.4") \
+    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1") \
     .master("spark://spark-master:7077") \
     .getOrCreate()
 #,event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
@@ -35,7 +35,7 @@ def stream_to_hdfs():
     json_expanded_df = json_expanded_df.withColumn("year", year(col("event_time")))
     json_expanded_df = json_expanded_df.withColumn("month", month(col("event_time")))
     json_expanded_df = json_expanded_df.withColumn("day", date_format(col("event_time"), "dd"))
-
+    
     query = json_expanded_df \
         .writeStream \
         .outputMode("append") \
@@ -43,9 +43,7 @@ def stream_to_hdfs():
         .option("path",f"hdfs://namenode:9000/tmp/")\
         .option("checkpointLocation", f"hdfs://namenode:9000/check-point-tmp/")\
         .partitionBy("year", "month", "day") \
-        .trigger(processingTime="1 seconds")\
         .start()
-
 
     query.awaitTermination()
 

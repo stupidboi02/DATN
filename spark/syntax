@@ -1,2 +1,7 @@
 spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 --master spark://spark-master:7077 /opt/airflow/code/extract.py
 spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 /opt/airflow/code/extract.py
+
+spark-submit --master spark://spark-master:7077 --jars /opt/airflow/code/postgresql-42.2.5.jar /opt/airflow/code/transform.py
+
+spark-submit --master spark://spark-master:7077 /opt/airflow/code/profile_user.py
+
