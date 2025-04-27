@@ -17,7 +17,8 @@ previous_request={
                 "year":None,
                 "month":None,
                 "day":None,
-                "total_rows": 0
+                "total_rows": 0,
+                "base_id":0
                 }
 
 @app.route("/get-data", methods=['GET'])
@@ -42,39 +43,48 @@ def get_data():
     try:
         con = duckdb.connect(f"./data/{year}-{month}.duckdb",read_only=True)
         
-        #sử dụng beetween để loại bỏ các ngày trước đó thay vì phải duyệt lại từ đầu nếu sử dụng "="
         year,month,day = int(year),int(month),int(day)
-        query = f"""
-                SELECT event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
-                FROM logs 
-                WHERE event_time BETWEEN '{year:04d}-{month:02d}-{day:02d} 00:00:00' AND '{year:04d}-{month:02d}-{day:02d} 23:59:59'
-                AND id > {offset}
-                ORDER BY id
-                LIMIT {limit}
-                """
-        data = con.execute(query).fetchdf() #execute trả về 1 cursor -> cần fetch để lấy data
-        data['event_time'] = data['event_time'].dt.strftime("%Y-%m-%d %H:%M:%S")
-        
+
         #kiểm tra nếu cùng 1 ngày thì không đếm lại số bản ghi
         if(year != previous_request['year'] 
            or month != previous_request['month'] 
            or day != previous_request['day']):    
             total_rows = con.execute(f"""
                                      SELECT count(*)
-                                     FROM logs
-                                     WHERE year(event_time) = {year} 
+                                      FROM logs
+                                    WHERE year(event_time) = {year} 
                                      AND month(event_time) = {month} 
                                      AND day(event_time) = {day} 
                                      """).fetchone()[0]  
+            base_id = con.execute(f"""
+                        SELECT min(id)
+                        FROM logs
+                        WHERE DATE_TRUNC('day', event_time) = DATE '{year}-{month:02d}-{day:02d}'
+                                """).fetchone()[0]
                                                 
             previous_request = {
                 "year" : year,
                 "month" : month,
                 "day" : day,
-                "total_rows": total_rows
+                "total_rows": total_rows,
+                "base_id": base_id
             }
         else:
             total_rows = previous_request.get("total_rows")
+            base_id = previous_request.get("base_id")
+        #sử dụng beetween để loại bỏ các ngày trước đó thay vì phải duyệt lại từ đầu nếu sử dụng "=="
+        query = f"""
+                SELECT event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
+                FROM logs 
+                WHERE event_time BETWEEN '{year:04d}-{month:02d}-{day:02d} 00:00:00' AND '{year:04d}-{month:02d}-{day:02d} 23:59:59'
+                AND id > {base_id + offset}
+                ORDER BY id
+                LIMIT {limit}
+                """
+        # BUGG O DAY
+        data = con.execute(query).fetchdf() #execute trả về 1 cursor -> cần fetch để lấy data
+        data['event_time'] = data['event_time'].dt.strftime("%Y-%m-%d %H:%M:%S")
+        
 
         con.close()
 

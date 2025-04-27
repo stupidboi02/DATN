@@ -192,7 +192,7 @@ services:
     volumes:
       - ./spark:/opt/airflow/code
   flask-service:
-    image: chickengang/flask:latest
+    image: chickengang/flask:newvers
     container_name: flask-service
     ports:
       - "5000:5000"
@@ -317,22 +317,23 @@ services:
       - final-pro
     volumes:
       - data-warehouse:/var/lib/postgresql/data
-  # db:
-  #   image: pgduckdb/pgduckdb:16-main
-  #   container_name: duckDB
-  #   ports:
-  #     - 5433:5432
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: duckdb
-  #   volumes:
-  #     - pgduckdb_data:/var/lib/postgresql/data
-  #     - ./postgresql.conf:/etc/postgresql/postgresql.conf
-  #   command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
+  # duck-ui:
+  #   image: ghcr.io/caioricciuti/duck-ui:latest
   #   restart: always
+  #   ports:
+  #     - "${DUCK_UI_PORT:-5522}:5522"
+  #   environment:
+  #     # External connection (optional)
+  #     - DUCK_UI_EXTERNAL_CONNECTION_NAME=${DUCK_UI_EXTERNAL_CONNECTION_NAME:-}
+  #     - DUCK_UI_EXTERNAL_HOST=${DUCK_UI_EXTERNAL_HOST:-}
+  #     - DUCK_UI_EXTERNAL_PORT=${DUCK_UI_EXTERNAL_PORT:-}
+  #     - DUCK_UI_EXTERNAL_USER=${DUCK_UI_EXTERNAL_USER:-}
+  #     - DUCK_UI_EXTERNAL_PASS=${DUCK_UI_EXTERNAL_PASS:-}
+  #     - DUCK_UI_EXTERNAL_DATABASE_NAME=${DUCK_UI_EXTERNAL_DATABASE_NAME:-}
+  #     # DuckDB configuration
+  #     - DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS=${DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:-false}
   #   networks:
   #     - final-pro
-
 networks:
   final-pro:
 
@@ -350,4 +351,3 @@ volumes:
   kafka_2_data:
   data-warehouse:
   pgadmin:
-  # pgduckdb_data:

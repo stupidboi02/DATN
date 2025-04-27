@@ -1,5 +1,5 @@
 from confluent_kafka import Producer
-import json,requests, threading, time, sys
+import json,requests, time, sys
 from datetime import datetime
 
 
@@ -19,14 +19,15 @@ producer = Producer(config)
 url = "http://flask-service:5000/get-data"
 
 def flush(year,month,day):
-    print(f"Thread started for {year}-{month}-{day:02d}")
-    limit = 20000
+    print(f"started for {year}-{month}-{day:02d}")
+    limit = 10000
     offset = 0
     params = {"year":year,"month":month,"day":f"{day:02d}","offset":offset,"limit":limit}
     topic = f"logs_data_{month}"
     while True:
         try:
             start_time0 = time.time()
+            print("Calling API with params:", params)
             res = requests.get(url=url, params=params)
             end_time0 = time.time()
             print(f"Thời gian gọi API: {end_time0 - start_time0:.2f} giây")

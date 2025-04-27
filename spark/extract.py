@@ -8,6 +8,9 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1") \
     .master("spark://spark-master:7077") \
     .getOrCreate()
+
+spark.sparkContext.setLogLevel("ERROR")
+
 #,event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
 
 json_schema = StructType([

@@ -198,7 +198,7 @@ if __name__ == "__main__":
                     .withColumn("purchase_history", array_union(
                         coalesce(col("purchase_history_today"), lit([])),
                         coalesce(col("purchase_history"), lit([]))
-                    )) \
+                    ))\
                     .drop("category_preferences","brand_preferences","category_preferences_today","brand_preferences_today",
                           "first_visit_today","last_visit_today","last_purchase_today","last_active_today",
                           "total_visits_today","purchase_history_today")\
