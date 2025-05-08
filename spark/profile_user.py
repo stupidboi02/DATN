@@ -35,7 +35,7 @@ user_profile_schema = StructType([
         StructField("trending", ArrayType(StringType()), True)
     ]), True),
     StructField("segments", StringType(), True),
-    StructField("last_used_timestamp", TimestampType(), True)
+    StructField("update_day", DateType(), True)
 ])
 
 def compute_timestamp(df_logs):
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         .getOrCreate()
         spark.sparkContext.setLogLevel("ERROR")
 
-        snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
+        snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d")
 
         #today path to transform
         year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
@@ -134,7 +134,6 @@ if __name__ == "__main__":
         user_profile_pre = f"hdfs://namenode:9000/staging/year={y}/month={m}/day={d}"
 
         df_logs = spark.read.parquet(logs_day_path)
-        # df_logs = spark.read.csv("/opt/airflow/code/2019-10-02.csv",header=True)
 
         timestamp_df = compute_timestamp(df_logs)
         purchase_history = compute_purchase_history(df_logs)
@@ -188,7 +187,6 @@ if __name__ == "__main__":
                                 .agg(map_from_entries(collect_list(struct("brand", "total_score"))).alias("brand_preferences"))
                     )
 
-            # profile update cuoi cung xu ly bang cach ghi de len cac cot 
             result = update_profile \
                     .withColumn("first_visit_timestamp", least("first_visit_today", "first_visit_timestamp")) \
                     .withColumn("last_visit_timestamp", greatest("last_visit_today", "last_visit_timestamp")) \
@@ -204,6 +202,7 @@ if __name__ == "__main__":
                           "total_visits_today","purchase_history_today")\
                     .join(category_prefs, "user_id", "left")\
                     .join(brand_prefs, "user_id", "left")
+            result = result.withColumn("update_day", lit(snapshot_date))
             result.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
                
 

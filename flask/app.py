@@ -81,7 +81,6 @@ def get_data():
                 ORDER BY id
                 LIMIT {limit}
                 """
-        # BUGG O DAY
         data = con.execute(query).fetchdf() #execute trả về 1 cursor -> cần fetch để lấy data
         data['event_time'] = data['event_time'].dt.strftime("%Y-%m-%d %H:%M:%S")
         

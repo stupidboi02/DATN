@@ -1,0 +1,34 @@
+from airflow.models.dag import DAG
+from airflow.operators.bash import BashOperator
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.models.param import Param
+default_args={
+        "depends_on_past": False,
+        "email": ["airflow@example.com"],
+        "email_on_failure": False,
+        "email_on_retry": False,
+        }
+with DAG(
+    "ingest_data",
+    default_args = default_args,
+    description ="ingest data pipeline",
+    catchup=False,
+    tags=["kafka"],
+    params={
+        "snapshot_date": Param("2019-10-1", type="string", title="Snapshot Date", description="Date for snapshot")
+    }
+) as dag:
+    kafka_task = BashOperator(
+        task_id = "stream_to_broker",
+        bash_command = "python3 /var/lib/producer.py '{{ params.snapshot_date }}'"
+    )
+    write_stream = BashOperator(
+        task_id = "stream_to_hdfs",
+        bash_command= """ 
+                    spark-submit \
+                    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
+                    --master spark://spark-master:7077 \
+                    /opt/airflow/code/extract.py\
+                    {{ params.snapshot_date }}
+                    """
+    )

@@ -1,7 +1,7 @@
 version: '3'
 
 x-airflow-common: &airflow-common
-  image: chickengang/airflow
+  image: chickengang/airflow:latest
   build:
     context: ./airflow
     dockerfile: dockerfile
@@ -11,8 +11,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:- apache-airflow-providers-microsoft-mssql}
+    AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - airflow_logs:/opt/airflow/logs
@@ -20,26 +19,25 @@ x-airflow-common: &airflow-common
     - airflow_scripts:/opt/airflow/scripts
     - ./spark:/opt/airflow/code
     - ./kafka:/var/lib
-  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
   depends_on:
     postgres:
       condition: service_healthy
   networks:
     - final-pro
 
-
 services:
   # Airflow cluster
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow-webserver
+    ports:
+      - 8080:8080
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 10s
       timeout: 10s
       retries: 5
-    ports:
-      - 8080:8080
     restart: always
     command: webserver
 
@@ -54,11 +52,11 @@ services:
     container_name: airflow-init
     environment:
       <<: *airflow-common-env
-      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-    command: version
+    command: db migrate
 
   postgres:
     image: postgres
@@ -75,7 +73,7 @@ services:
     networks:
       - final-pro
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - postgres-db:/var/lib/postgresql/data
 
   # HDFS cluster
   namenode:
@@ -217,7 +215,7 @@ services:
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
       # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-0:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
@@ -225,17 +223,12 @@ services:
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-      - KAFKA_CFG_NUM_PARTITIONS = 4
     volumes:
-      - kafka_0_data:/var/lib/
+      - kafka_0_data:/bitnami/kafka
       - ./kafka:/var/lib
-    # command: >
-    #   bash -c "
-    #   sleep 5 &&
-    #   python3 /var/lib/producer.py
-    #   "
     networks:
       - final-pro
+
   kafka-1:
     image: chickengang/kafka:latest
     container_name: kafka-1
@@ -249,7 +242,7 @@ services:
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
       # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-1:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
@@ -257,12 +250,11 @@ services:
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-      - KAFKA_CFG_NUM_PARTITIONS = 4
     volumes:
-      - kafka_1_data:/var/lib/
-      - ./kafka:/var/lib
+      - kafka_1_data:/var/lib/kafka/data
     networks:
       - final-pro
+
   kafka-2:
     image: chickengang/kafka:latest
     container_name: kafka-2
@@ -276,7 +268,7 @@ services:
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
       # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
@@ -284,10 +276,8 @@ services:
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-      - KAFKA_CFG_NUM_PARTITIONS = 4
     volumes:
-      - kafka_2_data:/var/lib/
-      - ./kafka:/var/lib
+      - kafka_2_data:/var/lib/kafka/data
     networks:
       - final-pro
 
@@ -334,11 +324,38 @@ services:
   #     - DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS=${DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:-false}
   #   networks:
   #     - final-pro
+  mongo:
+    image: mongo
+    container_name: my-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    networks:
+      - final-pro
+    volumes:
+      - mongodb:/data/db
+
+  mongo-express:
+    image: mongo-express
+    container_name: my-mongodb-client
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongo:27017
+      ME_CONFIG_BASICAUTH: false
+    networks:
+      - final-pro
+    depends_on:
+      - mongo
 networks:
   final-pro:
 
 volumes:
-  postgres-db-volume:
+  postgres-db:
   airflow_logs:
   airflow_plugins:
   airflow_scripts:
@@ -351,3 +368,4 @@ volumes:
   kafka_2_data:
   data-warehouse:
   pgadmin:
+  mongodb:
