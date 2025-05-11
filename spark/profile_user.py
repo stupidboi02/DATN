@@ -3,6 +3,7 @@ from pyspark.sql.functions import*
 from pyspark.sql.window import Window
 from pyspark.sql.types import *
 from datetime import datetime, timedelta
+from pyspark.ml.recommendation import ALSModel
 import sys
 
 user_profile_schema = StructType([
@@ -114,6 +115,14 @@ def compute_brand_preferences(df_logs):
         .withColumn("total_score",round(col("total_score"),2))\
         .groupBy("user_id").agg(map_from_entries((collect_list(struct("brand","total_score")))).alias("brand_preferences"))
         return brand_preferences
+
+def compute_recommendations(k):
+       model = ALSModel.load("hdfs://namenode:9000/models/als")
+       reco = model.recommendForAllUsers(k)
+       reco = reco.select("user_id",explode("recommendations").alias("rec"))\
+                    .select("user_id","rec.product_id")
+       result  = reco.groupBy("user_id").agg(collect_list("product_id").alias("recommend_products"))
+       return result 
 
 if __name__ == "__main__":
         spark = SparkSession.builder \

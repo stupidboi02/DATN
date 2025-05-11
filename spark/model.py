@@ -1,54 +1,45 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import*
-# from pyspark.ml.recommendation import ALS
+from pyspark.ml.recommendation import ALS
 from datetime import datetime, timedelta
 
 def reco_product():
     spark = SparkSession.builder.appName("RECO ALS").getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
-    # target_date = datetime.strptime(date, "%Y-%m-%d")
-
-    # dates_to_read = [target_date - timedelta(days=i) for i in range(1, num_days + 1)]
-
-    # base_path = "hdfs://namenode:9000/tmp/year=2019"
-    # paths = []
-    # for dt in dates_to_read:
-    #     month = str(dt.month).zfill(2)
-    #     day = str(dt.day).zfill(2)
-    #     path = f"{base_path}/month={month}/day={day}"
-    #     paths.append(path)
-    # df = spark.read.option("basePath", base_path).parquet(*paths)
     raw_df = spark.read.parquet("hdfs://namenode:9000/tmp/year=2019/month=10/*")
-    df = raw_df.dropna()
-
-    df = df.where(col("event_type")=="purchase")\
-                .groupBy("user_id", "product_id").agg(
-                count("*").alias("quantity"))
-    df.show()
-#     data = df.select(
-#         col("user_id"),
-#         col("product_id"),
-#         col("ratings")
-#         ).na.drop()
+    df = raw_df.dropna(subset=["user_id","product_id","event_type"])
+    df = df.withColumn("ratings",
+                       when((col("event_type")=="view"),1.0)
+                       .when((col("event_type")=="cart"),3.0)
+                       .when((col("event_type")=="purchase"),5.0)
+                       .otherwise(lit(0.0))
+                       )
+    # df.show()
+    data = df.groupBy("user_id","product_id").agg(sum(col("ratings")).alias("ratings"))\
+            .select(
+                col("user_id").cast("integer"),
+                col("product_id").cast("integer"),
+                col("ratings")
+            ).na.drop()
     
-#     if data.count() == 0:
-#         return
+    if data.count() == 0:
+        return
     
 #     # Train ALS Model
-#     als = ALS(
-#         userCol="user_id",
-#         itemCol="product_id",
-#         ratingCol="ratings",
-#         coldStartStrategy="drop",
-#         nonnegative=True,
-#         implicitPrefs=False,
-#         maxIter=10,
-#         rank=10,
-#         regParam=0.1
-#     )
-#     model = als.fit(data)
+    als = ALS(
+        userCol="user_id",
+        itemCol="product_id",
+        ratingCol="ratings",
+        coldStartStrategy="drop",
+        nonnegative=True,
+        implicitPrefs=False,
+        maxIter=10,
+        rank=10,
+        regParam=0.1
+    )
+    model = als.fit(data)
     
-#     model.write().overwrite().save("hdfs://namenode:9000/models/als")
+    model.write().overwrite().save("hdfs://namenode:9000/models/als")
 
 #     # Dự đoán sản phẩm cho tất cả người dùng
 #     user_recs = model.recommendForAllUsers(num_products)
