@@ -23,7 +23,10 @@ user_profile_schema = StructType([
             StructField("price", FloatType(), False)
         ])), False)
     ])), True),
-    StructField("recent_purchases", ArrayType(StringType()), True),
+    StructField("recent_purchases", ArrayType(StructType([
+        StructField("product_id", StringType(), False),
+        StructField("quantity", IntegerType(), False)]),
+        True)),
     StructField("category_preferences", MapType(StringType(), FloatType()), True),
     StructField("brand_preferences", MapType(StringType(), FloatType()), True),
     StructField("churn_prediction", StructType([
@@ -31,10 +34,7 @@ user_profile_schema = StructType([
         StructField("predicted_class", BooleanType(), True),
         StructField("last_prediction_timestamp", TimestampType(), True)
     ]), True),
-    StructField("recommendations", StructType([
-        StructField("personalized", ArrayType(StringType()), True),
-        StructField("trending", ArrayType(StringType()), True)
-    ]), True),
+    StructField("recommendations",ArrayType(StringType()), True),
     StructField("segments", StringType(), True),
     StructField("update_day", DateType(), True)
 ])
@@ -49,43 +49,45 @@ def compute_timestamp(df_logs):
             .select("user_id", "first_visit_timestamp","last_visit_timestamp","last_purchase_date","last_active_date","total_visits")
  
 def compute_purchase_history(df_logs):
-       product_agg = df_logs.filter(col("event_type") == "purchase")\
-        .groupBy("user_id", "user_session", "product_id")\
+    product_agg = df_logs.filter(col("event_type") == "purchase") \
+        .groupBy("user_id", "user_session", "product_id") \
         .agg(
             count("*").alias("quantity"),
-            first("price").alias("price")
-            )
-       order_time_df = df_logs.filter(col("event_type") == "purchase")\
-        .groupBy("user_id", "user_session")\
-        .agg(min("event_time").alias("order_timestamp"))
-       
-       purchase_history_df = product_agg.groupBy("user_id", "user_session").agg(
-        sum(col("quantity") * col("price")).alias("total_amount"),
+            round(first("price")).alias("price"),
+            min("event_time").alias("order_timestamp")
+        )
+
+    purchase_history_df = product_agg.groupBy("user_id", "user_session").agg(
+        round(sum(col("quantity") * col("price")), 2).alias("total_amount"),
+        first("order_timestamp").alias("order_timestamp"),
         collect_list(
             struct(col("product_id"), col("quantity"), col("price"))
-            ).alias("items"))
-       
-       purchase_history = purchase_history_df.join(order_time_df, on =["user_id","user_session"])\
-                                            .withColumnRenamed("user_session","order_id")
-       daily_purchase_history = purchase_history.groupBy("user_id").agg(
-        collect_list(
-            struct(col("order_id"),col("order_timestamp"),col("total_amount"),col("items"))
-        ).alias("purchase_history")
-    )
-       return daily_purchase_history
+        ).alias("items")) \
+        .withColumnRenamed("user_session", "order_id")
 
+    daily_purchase_history = purchase_history_df.groupBy("user_id").agg(
+        collect_list(
+            struct(col("order_id"), col("order_timestamp"), col("total_amount"), col("items"))
+        ).alias("purchase_history"))
+    return daily_purchase_history
+
+#dang loi cho nay
 def compute_recent_purchase(purchase_history):
-        purchase_history = purchase_history.withColumn("order",explode(col("purchase_history")))
-        purchase_history = purchase_history.select("user_id","order.*")
-        recent_df = purchase_history.select(
-            "user_id", "order_timestamp", explode("items").alias("item")
-        ).select("user_id", "order_timestamp", col("item.product_id").alias("product_id"))
-        
-        window = Window.partitionBy("user_id").orderBy(col("order_timestamp").desc())
-        recent_df = recent_df.withColumn("rank", row_number().over(window))
-        recent_purchase = recent_df.filter(col("rank")<=5)\
-        .groupBy("user_id").agg(collect_list("product_id").alias("recent_purchase"))
-        return recent_purchase
+    purchase_history_exploded = purchase_history.withColumn("order", explode(col("purchase_history"))) \
+        .select("user_id", "order.*")
+
+    window = Window.partitionBy("user_id").orderBy(col("order_timestamp").desc())
+    ranked_orders = purchase_history_exploded.withColumn("order_rank", row_number().over(window)) \
+        .filter(col("order_rank") <= 5) \
+        .drop("order_rank")
+
+    recent_items = ranked_orders.withColumn("item", explode(col("items"))) \
+        .groupBy("user_id", col("item.product_id").alias("product_id")) \
+        .agg(sum(col("item.quantity")).alias("quantity")) \
+        .groupBy("user_id") \
+        .agg(collect_list(struct("product_id", "quantity")).alias("recent_purchases"))
+
+    return recent_items
 
 def compute_category_preferences(df_logs):
         event_weights={"view": 0.1, "cart": 0.2, "purchase":0.3}
@@ -116,13 +118,35 @@ def compute_brand_preferences(df_logs):
         .groupBy("user_id").agg(map_from_entries((collect_list(struct("brand","total_score")))).alias("brand_preferences"))
         return brand_preferences
 
-def compute_recommendations(k):
-       model = ALSModel.load("hdfs://namenode:9000/models/als")
-       reco = model.recommendForAllUsers(k)
-       reco = reco.select("user_id",explode("recommendations").alias("rec"))\
-                    .select("user_id","rec.product_id")
-       result  = reco.groupBy("user_id").agg(collect_list("product_id").alias("recommend_products"))
-       return result 
+# def compute_recommendations(df_logs,k):
+#        model = ALSModel.load("hdfs://namenode:9000/models/als")
+#        #user da train
+#        trained_user = model.userFactors.select(col("id").alias("user_id")).distinct()
+#        #user log hang ngay
+#        logs_user = df_logs.select(col("user_id")).distinct()
+#        #new user
+#        new_users = logs_user.join(trained_user, on="user_id", how="left_anti")
+
+#        top_k_products_df = df_logs.dropna(subset=["product_id"]).groupBy("product_id")\
+#                                 .agg(count("*").alias("count"))\
+#                                 .orderBy(col("count").desc())\
+#                                 .limit(k)
+#        #list product
+#        top_k_product = top_k_products_df.agg(collect_list("product_id").alias("recommendations"))\
+#                                         .collect()[0]["recommendations"]
+       
+#        # Tạo DataFrame chứa list sản phẩm phổ biến
+#        top_k_df = spark.createDataFrame([(top_k_product,)], ["recommendations"])
+       
+#        new_user_result = new_users.crossJoin(top_k_df)
+
+#        recommendation = model.recommendForAllUsers(k)
+#        recommendation = recommendation.select("user_id",explode("recommendations").alias("rec"))\
+#                     .select("user_id","rec.product_id")
+       
+#        his_user_result  = recommendation.groupBy("user_id").agg(collect_list("product_id").alias("recommendations"))
+#        result = his_user_result.union(new_user_result)
+#        return result 
 
 if __name__ == "__main__":
         spark = SparkSession.builder \
@@ -149,11 +173,15 @@ if __name__ == "__main__":
         recent_purchase = compute_recent_purchase(purchase_history)
         category_preferences = compute_category_preferences(df_logs)
         brand_preferences = compute_brand_preferences(df_logs)
+        # recommendations_k_product = compute_recommendations(df_logs,5)
 
         daily_profile = timestamp_df\
                         .join(purchase_history,"user_id","left")\
                         .join(category_preferences,"user_id","left")\
-                        .join(brand_preferences,"user_id","left")
+                        .join(brand_preferences,"user_id","left")\
+                        .join(recent_purchase,"user_id","left")\
+                        .withColumn("update_day", lit(snapshot_date))
+                        # .join(recommendations_k_product,"user_id","left")\
         
         daily_profile_rename = daily_profile.selectExpr(
                "user_id as user_id",
@@ -164,7 +192,10 @@ if __name__ == "__main__":
                "total_visits as total_visits_today",
                "purchase_history as purchase_history_today",
                "category_preferences as category_preferences_today",
-               "brand_preferences as brand_preferences_today"
+               "brand_preferences as brand_preferences_today",
+               "recent_purchases as recent_purchases_today",
+            #    "recommendations as recommendations_today",
+               "update_day as update_day_today"
             )
         #neu la ngay dau tien 
         try:
@@ -175,7 +206,7 @@ if __name__ == "__main__":
 
         #neu khong phai ngay dau
         if df_profile.count() > 0:
-            update_profile = df_profile.join(daily_profile_rename,"user_id","left")
+            update_profile = df_profile.join(daily_profile_rename,"user_id","outer")
 
         # logic tinh lai brand va cate kieu MAP
             today_exploded = update_profile.select("user_id",explode("category_preferences_today").alias("category", "score"))
@@ -206,12 +237,15 @@ if __name__ == "__main__":
                         coalesce(col("purchase_history_today"), lit([])),
                         coalesce(col("purchase_history"), lit([]))
                     ))\
+                    .withColumn("recent_purchases",coalesce("recent_purchases_today", "recent_purchases"))\
                     .drop("category_preferences","brand_preferences","category_preferences_today","brand_preferences_today",
                           "first_visit_today","last_visit_today","last_purchase_today","last_active_today",
-                          "total_visits_today","purchase_history_today")\
+                          "total_visits_today","purchase_history_today","recent_purchases_today",)\
                     .join(category_prefs, "user_id", "left")\
-                    .join(brand_prefs, "user_id", "left")
-            result = result.withColumn("update_day", lit(snapshot_date))
+                    .join(brand_prefs, "user_id", "left")\
+                    .withColumn("update_day", coalesce("update_day_today", "update_day")).drop("update_day_today")
+                    # .withColumn("recommendations", coalesce(col("recommendations_today"), lit([])))\
+
             result.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
                
 

@@ -97,7 +97,7 @@ if __name__ == "__main__":
     # date = datetime.strptime(sys.argv[1], "%Y-%m-%d")
     # year, month, day = date.year, date.month, date.day
     year = 2019
-    month = 10
-    for day in range(1,32):
+    month = 11
+    for day in range(1,6):
         flush(year,month,day)
 
