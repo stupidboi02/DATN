@@ -1,4 +1,4 @@
-FROM bitnami/spark:3.5
+FROM bitnami/spark:3.5.0
 WORKDIR /tmp
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt

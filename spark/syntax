@@ -5,5 +5,5 @@ spark-submit --master spark://spark-master:7077 --jars /opt/airflow/code/postgre
 spark-submit --master spark://spark-master:7077 /opt/airflow/code/profile_user.py
 spark-submit --master spark://spark-master:7077 /opt/airflow/code/test.py
 
-spark-submit --packages org.mongodb.spark:mongo-spark-connector_2.13:10.5.0 --master spark://spark-master:7077 /opt/airflow/code/load.py
+spark-submit --packages org.mongodb.spark:mongo-spark-connector_2.12:10.5.0 --master spark://spark-master:7077 /opt/airflow/code/load.py
 
