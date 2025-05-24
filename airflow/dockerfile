@@ -9,5 +9,7 @@ ENV JAVA_HOME /usr/lib/jvm/java-17-openjdk-amd64
 RUN export JAVA_HOME
 
 USER airflow
-RUN pip install apache-airflow-providers-apache-spark\
-    && pip install confluent_kafka
+RUN pip install --no-cache-dir \
+    apache-airflow-providers-apache-spark \
+    pyspark==3.5.0 \ 
+    confluent_kafka

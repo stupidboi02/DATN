@@ -22,13 +22,13 @@ with DAG(
         task_id = "stream_to_broker",
         bash_command = "python3 /var/lib/producer.py '{{ params.snapshot_date }}'"
     )
-    write_stream = BashOperator(
+    write_stream = SparkSubmitOperator(
         task_id = "stream_to_hdfs",
-        bash_command= """ 
-                    spark-submit \
-                    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
-                    --master spark://spark-master:7077 \
-                    /opt/airflow/code/extract.py\
-                    {{ params.snapshot_date }}
-                    """
+        application="/opt/airflow/code/extract.py",
+        conn_id="spark_default",
+        application_args=["{{ params.snapshot_date }}"],
+        packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1",
+        conf={
+            "spark.master": "spark://spark-master:7077"
+        },
     )

@@ -43,7 +43,6 @@ if __name__ == "__main__":
     spark = SparkSession.builder\
         .appName("LoadToDWH")\
         .master("spark://spark-master:7077")\
-        .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:3.0.1") \
         .config("spark.mongodb.read.connection.uri", "mongodb://admin:admin@mongo:27017/admin.user_profile") \
         .config("spark.mongodb.write.connection.uri", "mongodb://admin:admin@mongo:27017/admin.user_profile") \
         .getOrCreate()

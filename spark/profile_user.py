@@ -103,109 +103,6 @@ def compute_total_items_purchased(df_logs):
                          round(sum("price")).alias("total_spend"))
        return df
 
-def transform():
-        df_logs = spark.read.parquet(logs_day_path)
-        timestamp_df = compute_timestamp(df_logs)
-        purchase_history = compute_purchase_history(df_logs)
-        category_preferences = compute_category_preferences(df_logs)
-        brand_preferences = compute_brand_preferences(df_logs)
-        total_item_purchased = compute_total_items_purchased(df_logs)
-
-        daily_profile = timestamp_df\
-                        .join(purchase_history,"user_id","left")\
-                        .join(category_preferences,"user_id","left")\
-                        .join(brand_preferences,"user_id","left")\
-                        .join(total_item_purchased,"user_id","left")\
-                        .withColumn("update_day", lit(snapshot_date))
-        
-        daily_profile_rename = daily_profile.selectExpr(
-               "user_id as user_id",
-               "first_visit_timestamp as first_visit_today",
-               "last_visit_timestamp as last_visit_today",
-               "last_purchase_date as last_purchase_today",
-               "last_active_date as last_active_today",
-               "total_visits as total_visits_today",
-               "purchase_history as purchase_history_today",
-               "category_preferences as category_preferences_today",
-               "brand_preferences as brand_preferences_today",
-               "total_items_purchased as total_items_purchased_today",
-               "total_spend as total_spend_today",
-               "update_day as update_day_today"
-            )
-        try:
-                df_profile = spark.read.parquet(user_profile_pre)
-        except:
-        #neu la ngay dau tien 
-                df_profile = spark.createDataFrame([],schema=user_profile_schema)
-                first_day_profile = daily_profile.withColumn("segments",when((col("total_spend") > 500000) & (col("total_visits") > 100) & (col("total_items_purchased") > 5),"VIP")
-                                                                .when((col("total_spend") > 100000),"High Value")
-                                                                .when((col("last_purchase_date") >= date_sub(col("update_day"), 15)) & (col("total_items_purchased") > 0),"Recent Active Buyers")
-                                                                .otherwise("General Audience"))\
-                                                .withColumn("day_since_last_purchase",date_diff("update_day","last_purchase_date"))\
-                                                .withColumn("day_since_last_active",date_diff("update_day","last_active_date"))\
-                                                .withColumn("churn_risk", when((col("day_since_last_purchase") >= 30) & (col("day_since_last_active") >= 30), "Very High")
-                                                                        .when((col("day_since_last_purchase") >= 20) | (col("day_since_last_active") >= 20),"High")
-                                                                        .when((col("day_since_last_purchase") >= 10) & (col("day_since_last_active") < 10), "Normal")
-                                                                        .otherwise("Low")
-                                            ).drop("day_since_last_purchase","day_since_last_active")
-                first_day_profile.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
-
-        #neu khong phai ngay dau
-        if df_profile.count() > 0:
-            update_profile = df_profile.join(daily_profile_rename,"user_id","outer")
-
-        # logic tinh lai brand va cate kieu MAP
-            today_exploded = update_profile.select("user_id",explode("category_preferences_today").alias("category", "score"))
-            his_exploded = update_profile.select("user_id",explode("category_preferences").alias("category", "score"))
-            cate_merge = today_exploded.union(his_exploded)
-            category_prefs = (
-                cate_merge.groupBy("user_id", "category").agg((sum("score")/count("*")).alias("total_score"))
-                                .groupBy("user_id")
-                                .agg(map_from_entries(collect_list(struct("category", "total_score"))).alias("category_preferences"))
-                    )
-            
-            today_exploded = update_profile.select("user_id",explode("brand_preferences_today").alias("brand", "score"))
-            his_exploded = update_profile.select("user_id",explode("brand_preferences").alias("brand", "score"))
-            brand_merge = today_exploded.union(his_exploded)
-            brand_prefs = (
-                brand_merge.groupBy("user_id", "brand").agg((sum("score")/count("*")).alias("total_score"))
-                                .groupBy("user_id")
-                                .agg(map_from_entries(collect_list(struct("brand", "total_score"))).alias("brand_preferences"))
-                    )
-
-            result = update_profile \
-                    .withColumn("first_visit_timestamp", least("first_visit_today", "first_visit_timestamp")) \
-                    .withColumn("last_visit_timestamp", greatest("last_visit_today", "last_visit_timestamp")) \
-                    .withColumn("last_purchase_date", greatest("last_purchase_today", "last_purchase_date")) \
-                    .withColumn("last_active_date", greatest("last_active_today", "last_active_date")) \
-                    .withColumn("total_visits", coalesce(col("total_visits_today"), lit(0)) + coalesce(col("total_visits"), lit(0))) \
-                    .withColumn("purchase_history", array_union(
-                        coalesce(col("purchase_history_today"), lit([])),
-                        coalesce(col("purchase_history"), lit([]))))\
-                    .withColumn("total_items_purchased",coalesce(col("total_items_purchased_today"), lit(0)) + coalesce(col("total_items_purchased"), lit(0)))\
-                    .withColumn("total_spend",coalesce(col("total_spend_today"), lit(0)) + coalesce(col("total_spend"), lit(0)))\
-                    .drop("category_preferences","brand_preferences","category_preferences_today","brand_preferences_today",
-                          "first_visit_today","last_visit_today","last_purchase_today","last_active_today",
-                          "total_visits_today","purchase_history_today","total_items_purchased_today","total_spend_today")\
-                    .join(category_prefs, "user_id", "left")\
-                    .join(brand_prefs, "user_id", "left")\
-                    .withColumn("update_day", coalesce("update_day_today", "update_day")).drop("update_day_today")
-            #sau khi update profile
-            result = result.withColumn("segments", 
-                            when((col("total_spend") > 100000) & (col("total_visits") > 100) & (col("total_items_purchased") > 5),"VIP")
-                            .when((col("last_purchase_date") >= date_sub(col("update_day"), 15)) & (col("total_items_purchased") > 0),"Recent Active Buyers")
-                            .when((col("total_spend") > 50000),"High Value")
-                            .otherwise("General Audience"))\
-                        .withColumn("day_since_last_purchase",date_diff("update_day","last_purchase_date"))\
-                        .withColumn("day_since_last_active",date_diff("update_day","last_active_date"))\
-                        .withColumn("churn_risk", when((col("day_since_last_purchase") >= 30) & (col("day_since_last_active") >= 30), "Very High")
-                                                .when((col("day_since_last_purchase") >= 20) | (col("day_since_last_active") >= 20),"High")
-                                                .when((col("day_since_last_purchase") >= 10) & (col("day_since_last_active") < 10), "Normal")
-                                                .otherwise("Low")
-                                    ).drop("day_since_last_purchase","day_since_last_active")
-
-            result.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
-
 def transform(snapshot_date, df_logs):
     #previous path profile
     prev_snapshot = snapshot_date - timedelta(1)
@@ -314,24 +211,24 @@ def transform(snapshot_date, df_logs):
         result.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
 if __name__ == "__main__":
         spark = SparkSession.builder \
-        .appName("Transformation") \
+        .appName("CalculateProfile") \
         .master("spark://spark-master:7077")\
         .getOrCreate()
         spark.sparkContext.setLogLevel("ERROR")
 
-        for x in range(1,32):
-            tmp = "2019-10-"
-            snapshot_date = datetime.strptime(tmp + str(x).zfill(2),"%Y-%m-%d").date()
+        # for x in range(1,32):
+            # tmp = "2019-10-"
+            # snapshot_date = datetime.strptime(tmp + str(x).zfill(2),"%Y-%m-%d").date()
 
-            # snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
-            print(snapshot_date)
-            #today path to transform
-            year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
-            logs_day_path = f"hdfs://namenode:9000/tmp/year={year}/month={month}/day={day}"
+        snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
+        print(snapshot_date)
+        #today path to transform
+        year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
+        logs_day_path = f"hdfs://namenode:9000/tmp/year={year}/month={month}/day={day}"
 
-            df_logs = spark.read.parquet(logs_day_path)
+        df_logs = spark.read.parquet(logs_day_path)
 
-            transform(snapshot_date,df_logs)
+        transform(snapshot_date,df_logs)
 
 
                

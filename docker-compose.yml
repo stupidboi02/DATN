@@ -1,7 +1,7 @@
 version: '3'
 
 x-airflow-common: &airflow-common
-  image: chickengang/airflow:latest
+  image: airflow
   build:
     context: ./airflow
     dockerfile: dockerfile
@@ -202,111 +202,111 @@ services:
       [ "sh", "-c", "python -m flask --app app.py run --host=0.0.0.0 --reload && tail -f /dev/null" ]  
 # Other
 
-  kafka-0:
-    image: chickengang/kafka:latest
-    container_name: kafka-0
-    ports:
-      - "9092:9092"
-    environment:
-      # KRaft settings
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-      # Listeners
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Clustering
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-    volumes:
-      - kafka_0_data:/bitnami/kafka
-      - ./kafka:/var/lib
-    networks:
-      - final-pro
+  # kafka-0:
+  #   image: chickengang/kafka:latest
+  #   container_name: kafka-0
+  #   ports:
+  #     - "9092:9092"
+  #   environment:
+  #     # KRaft settings
+  #     - KAFKA_CFG_NODE_ID=0
+  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
+  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+  #     # Listeners
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+  #     # Clustering
+  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+  #   volumes:
+  #     - kafka_0_data:/bitnami/kafka
+  #     - ./kafka:/var/lib
+  #   networks:
+  #     - final-pro
 
-  kafka-1:
-    image: chickengang/kafka:latest
-    container_name: kafka-1
-    ports:
-      - "9093:9092"
-    environment:
-      # KRaft settings
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-      # Listeners
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Clustering
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-    volumes:
-      - kafka_1_data:/var/lib/kafka/data
-    networks:
-      - final-pro
+  # kafka-1:
+  #   image: chickengang/kafka:latest
+  #   container_name: kafka-1
+  #   ports:
+  #     - "9093:9092"
+  #   environment:
+  #     # KRaft settings
+  #     - KAFKA_CFG_NODE_ID=1
+  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
+  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+  #     # Listeners
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+  #     # Clustering
+  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+  #   volumes:
+  #     - kafka_1_data:/var/lib/kafka/data
+  #   networks:
+  #     - final-pro
 
-  kafka-2:
-    image: chickengang/kafka:latest
-    container_name: kafka-2
-    ports:
-      - "9094:9092"
-    environment:
-      # KRaft settings
-      - KAFKA_CFG_NODE_ID=2
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-      # Listeners
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Clustering
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-    volumes:
-      - kafka_2_data:/var/lib/kafka/data
-    networks:
-      - final-pro
+  # kafka-2:
+  #   image: chickengang/kafka:latest
+  #   container_name: kafka-2
+  #   ports:
+  #     - "9094:9092"
+  #   environment:
+  #     # KRaft settings
+  #     - KAFKA_CFG_NODE_ID=2
+  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
+  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+  #     # Listeners
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+  #     # Clustering
+  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+  #   volumes:
+  #     - kafka_2_data:/var/lib/kafka/data
+  #   networks:
+  #     - final-pro
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    volumes:
-      - pgadmin:/var/lib/pgadmin
-    ports:
-      - "5050:80"
-    networks:
-      - final-pro
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   container_name: pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   volumes:
+  #     - pgadmin:/var/lib/pgadmin
+  #   ports:
+  #     - "5050:80"
+  #   networks:
+  #     - final-pro
 
-  data-warehouse:
-    image: postgres
-    container_name: my-warehouse
-    environment:
-      - POSTGRES_USER=datawarehouse
-      - POSTGRES_PASSWORD=datawarehouse
-      - POSTGRES_DB=datawarehouse
-    ports:
-      - 5432:5432
-    networks:
-      - final-pro
-    volumes:
-      - data-warehouse:/var/lib/postgresql/data
+  # data-warehouse:
+  #   image: postgres
+  #   container_name: my-warehouse
+  #   environment:
+  #     - POSTGRES_USER=datawarehouse
+  #     - POSTGRES_PASSWORD=datawarehouse
+  #     - POSTGRES_DB=datawarehouse
+  #   ports:
+  #     - 5432:5432
+  #   networks:
+  #     - final-pro
+  #   volumes:
+  #     - data-warehouse:/var/lib/postgresql/data
   # duck-ui:
   #   image: ghcr.io/caioricciuti/duck-ui:latest
   #   restart: always
@@ -328,6 +328,8 @@ services:
     image: mongo
     container_name: my-mongodb
     restart: always
+    ports:
+      - 27017:27017
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
@@ -351,21 +353,21 @@ services:
       - final-pro
     depends_on:
       - mongo
-  superset:
-    build:
-      context: ./superset
-      dockerfile: dockerfile
-    container_name: superset
-    environment:
-      - ADMIN_USERNAME=admin
-      - ADMIN_EMAIL=admin@admin.com
-      - ADMIN_PASSWORD=admin
-    ports:
-      - '8088:8088'
-    networks:
-      - final-pro
-    volumes:
-      - superset:/app/home
+  # superset:
+  #   build:
+  #     context: ./superset
+  #     dockerfile: dockerfile
+  #   container_name: superset
+  #   environment:
+  #     - ADMIN_USERNAME=admin
+  #     - ADMIN_EMAIL=admin@admin.com
+  #     - ADMIN_PASSWORD=admin
+  #   ports:
+  #     - '8088:8088'
+  #   networks:
+  #     - final-pro
+  #   volumes:
+  #     - superset:/app/home
 networks:
   final-pro:
 
