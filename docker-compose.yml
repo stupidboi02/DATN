@@ -18,7 +18,6 @@ x-airflow-common: &airflow-common
     - airflow_plugins:/opt/airflow/plugins
     - airflow_scripts:/opt/airflow/scripts
     - ./spark:/opt/airflow/code
-    - ./kafka:/var/lib
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
   depends_on:
     postgres:
@@ -80,7 +79,7 @@ services:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
     ports:
-      - 9870:9870
+      - 9876:9870
       - 9000:9000
     environment:
       - CLUSTER_NAME=test
@@ -95,7 +94,7 @@ services:
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: datanode-1
+    container_name: datanode1
     environment:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
@@ -158,7 +157,7 @@ services:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=spark-worker-1
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_CORES=3
       - SPARK_WORKER_MEMORY=2G
       - SPARK_DRIVER_MEMORY=2G
       - SPARK_EXECUTOR_MEMORY=2G
@@ -181,7 +180,7 @@ services:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=spark-worker-2
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_CORES=3
       - SPARK_WORKER_MEMORY=2G
       - SPARK_DRIVER_MEMORY=2G
       - SPARK_EXECUTOR_MEMORY=2G
@@ -202,128 +201,120 @@ services:
       [ "sh", "-c", "python -m flask --app app.py run --host=0.0.0.0 --reload && tail -f /dev/null" ]  
 # Other
 
-  # kafka-0:
-  #   image: chickengang/kafka:latest
-  #   container_name: kafka-0
-  #   ports:
-  #     - "9092:9092"
-  #   environment:
-  #     # KRaft settings
-  #     - KAFKA_CFG_NODE_ID=0
-  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
-  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-  #     # Listeners
-  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-  #     # Clustering
-  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-  #   volumes:
-  #     - kafka_0_data:/bitnami/kafka
-  #     - ./kafka:/var/lib
-  #   networks:
-  #     - final-pro
+  kafka-0:
+    image: bitnami/kafka:3.7.0 
+    container_name: kafka-0
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft settings
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      # Listeners
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-0:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Clustering
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+    volumes:
+      - kafka_0_data:/bitnami/kafka/data
+    networks:
+      - final-pro
 
-  # kafka-1:
-  #   image: chickengang/kafka:latest
-  #   container_name: kafka-1
-  #   ports:
-  #     - "9093:9092"
-  #   environment:
-  #     # KRaft settings
-  #     - KAFKA_CFG_NODE_ID=1
-  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
-  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-  #     # Listeners
-  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-  #     # Clustering
-  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-  #   volumes:
-  #     - kafka_1_data:/var/lib/kafka/data
-  #   networks:
-  #     - final-pro
+  kafka-1:
+    image: bitnami/kafka:3.7.0 
+    container_name: kafka-1
+    ports:
+      - "9093:9092"
+    environment:
+      # KRaft settings
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      # Listeners
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-1:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Clustering
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+    volumes:
+      - kafka_1_data:/bitnami/kafka/data
+    networks:
+      - final-pro
 
-  # kafka-2:
-  #   image: chickengang/kafka:latest
-  #   container_name: kafka-2
-  #   ports:
-  #     - "9094:9092"
-  #   environment:
-  #     # KRaft settings
-  #     - KAFKA_CFG_NODE_ID=2
-  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
-  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
-  #     - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
-  #     # Listeners
-  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
-  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-  #     - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-  #     # Clustering
-  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
-  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
-  #   volumes:
-  #     - kafka_2_data:/var/lib/kafka/data
-  #   networks:
-  #     - final-pro
+  kafka-2:
+    image: bitnami/kafka:3.7.0 
+    container_name: kafka-2
+    ports:
+      - "9094:9092"
+    environment:
+      # KRaft settings
+      - KAFKA_CFG_NODE_ID=2
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      # Listeners
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Clustering
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+    volumes:
+      - kafka_2_data:/bitnami/kafka/data
+    networks:
+      - final-pro
+  producer:
+    image: producer
+    container_name: producer
+    volumes:
+      - ./kafka:/app
+    command: tail -f /dev/null
+    depends_on:
+      - spark-master
+    networks:
+      - final-pro
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - final-pro
 
-  # pgadmin:
-  #   image: dpage/pgadmin4
-  #   container_name: pgadmin
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
-  #     PGADMIN_DEFAULT_PASSWORD: admin
-  #   volumes:
-  #     - pgadmin:/var/lib/pgadmin
-  #   ports:
-  #     - "5050:80"
-  #   networks:
-  #     - final-pro
+  data-warehouse:
+    image: postgres
+    container_name: my-warehouse
+    environment:
+      - POSTGRES_USER=mydatabase
+      - POSTGRES_PASSWORD=mydatabase
+      - POSTGRES_DB=mydatabase
+    ports:
+      - 5432:5432
+    networks:
+      - final-pro
+    volumes:
+      - data-warehouse:/var/lib/postgresql/data
 
-  # data-warehouse:
-  #   image: postgres
-  #   container_name: my-warehouse
-  #   environment:
-  #     - POSTGRES_USER=datawarehouse
-  #     - POSTGRES_PASSWORD=datawarehouse
-  #     - POSTGRES_DB=datawarehouse
-  #   ports:
-  #     - 5432:5432
-  #   networks:
-  #     - final-pro
-  #   volumes:
-  #     - data-warehouse:/var/lib/postgresql/data
-  # duck-ui:
-  #   image: ghcr.io/caioricciuti/duck-ui:latest
-  #   restart: always
-  #   ports:
-  #     - "${DUCK_UI_PORT:-5522}:5522"
-  #   environment:
-  #     # External connection (optional)
-  #     - DUCK_UI_EXTERNAL_CONNECTION_NAME=${DUCK_UI_EXTERNAL_CONNECTION_NAME:-}
-  #     - DUCK_UI_EXTERNAL_HOST=${DUCK_UI_EXTERNAL_HOST:-}
-  #     - DUCK_UI_EXTERNAL_PORT=${DUCK_UI_EXTERNAL_PORT:-}
-  #     - DUCK_UI_EXTERNAL_USER=${DUCK_UI_EXTERNAL_USER:-}
-  #     - DUCK_UI_EXTERNAL_PASS=${DUCK_UI_EXTERNAL_PASS:-}
-  #     - DUCK_UI_EXTERNAL_DATABASE_NAME=${DUCK_UI_EXTERNAL_DATABASE_NAME:-}
-  #     # DuckDB configuration
-  #     - DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS=${DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:-false}
-  #   networks:
-  #     - final-pro
   mongo:
     image: mongo
     container_name: my-mongodb

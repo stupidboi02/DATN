@@ -905,3 +905,22 @@ body {
 .bg-blue-600:hover {
     background-color: #1d4ed8;
 }
+
+/* Analytics button styles */
+.bg-green-600 {
+    background-color: #059669;
+    transition: background-color 0.3s;
+}
+
+.bg-green-600:hover {
+    background-color: #047857;
+}
+
+/* Chart styles */
+.space-y-8>*+* {
+    margin-top: 2rem;
+}
+
+.text-red-600 {
+    color: #dc2626;
+}

@@ -41,6 +41,14 @@ class UserProfile(BaseModel):
     churn_risk: Optional[str]
     category_preferences: Optional[Dict[str, float]]
     brand_preferences: Optional[Dict[str, float]]
+    total_support_interactions: Optional[int] = 0
+    total_calls: Optional[int] = 0
+    total_chats: Optional[int] = 0
+    total_tickets: Optional[int] = 0
+    last_support_interaction_time: Optional[datetime] = None
+    avg_satisfaction_score: Optional[float] = None
+    most_frequent_issue_category: Optional[str] = None
+    support_prone_flag: Optional[bool] = False
 
     class Config:
         validate_by_name = True  # Thay cho allow_population_by_field_name

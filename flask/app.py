@@ -50,11 +50,11 @@ def get_data():
            or month != previous_request['month'] 
            or day != previous_request['day']):    
             total_rows = con.execute(f"""
-                                     SELECT count(*)
-                                      FROM logs
+                                    SELECT count(*)
+                                    FROM logs
                                     WHERE year(event_time) = {year} 
-                                     AND month(event_time) = {month} 
-                                     AND day(event_time) = {day} 
+                                    AND month(event_time) = {month} 
+                                    AND day(event_time) = {day} 
                                      """).fetchone()[0]  
             base_id = con.execute(f"""
                         SELECT min(id)

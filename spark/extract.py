@@ -11,7 +11,7 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("ERROR")
 
-json_schema = StructType([
+event_logs_schema = StructType([
     StructField("event_time",TimestampType(),True),
     StructField("event_type", StringType(),True),
     StructField("product_id",LongType(),True),
@@ -22,6 +22,14 @@ json_schema = StructType([
     StructField("user_id",LongType(),True),
     StructField("user_session",StringType(),True)
 ])
+support_logs_schema = StructType([
+    StructField("event_time",TimestampType(),True),
+    StructField("user_id", StringType(),True),
+    StructField("interaction_type", StringType(),True),
+    StructField("issue_category", StringType(),True),
+    StructField("resolution_status", StringType(),True),
+    StructField("satisfaction_score", DoubleType(),True)
+])
 
 def stream_to_hdfs():
     df = spark.readStream \
@@ -29,55 +37,44 @@ def stream_to_hdfs():
         .option("kafka.bootstrap.servers", "kafka-0:9092,kafka-1:9092,kafka-2:9092")\
         .option("failOnDataLoss", "false") \
         .option("includeHeaders", "true") \
-        .option("subscribe", "logs_data_10, logs_data_11, stop-signal-topic") \
+        .option("subscribe", "logs_data_10, logs_data_11, customer_support_logs") \
         .load()
     
-    json_df = df.filter(col("topic").isin("logs_data_10","logs_data_11"))\
-    .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING) as msg_value")
-    json_expanded_df = json_df.withColumn("msg_value", from_json(json_df["msg_value"], json_schema)).select("msg_value.*")
-    json_expanded_df = json_expanded_df.withColumn("year", year(col("event_time")))
-    json_expanded_df = json_expanded_df.withColumn("month", month(col("event_time")))
-    json_expanded_df = json_expanded_df.withColumn("day", date_format(col("event_time"), "dd"))
-    
-    query = json_expanded_df \
+    event_df = df.filter(col("topic").isin("logs_data_10","logs_data_11"))\
+                .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING) as msg_value")
+    event_expanded_df = event_df.withColumn("msg_value", from_json(event_df["msg_value"], event_logs_schema)).select("msg_value.*")
+    event_expanded_df = event_expanded_df.withColumn("year", year(col("event_time")))\
+                                        .withColumn("month", month(col("event_time")))\
+                                        .withColumn("day", date_format(col("event_time"), "dd"))
+                                    
+    support_df = df.filter(col("topic") == "customer_support_logs")\
+                .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING) as value") \
+                .select(from_json(col("value"), support_logs_schema).alias("data")) \
+                .select("data.*")
+    support_df = support_df.withColumn("year", year(col("event_time")))\
+                            .withColumn("month", month(col("event_time")))\
+                            .withColumn("day", date_format(col("event_time"), "dd"))
+
+    query_event = event_expanded_df \
         .writeStream \
         .outputMode("append") \
         .format("parquet")\
-        .option("path","hdfs://namenode:9000/tmp/")\
+        .option("path","hdfs://namenode:9000/raw_event/")\
         .option("checkpointLocation", "hdfs://namenode:9000/check-point-tmp/")\
         .partitionBy("year", "month", "day") \
         .start()
+    #spark sẽ không lưu các cột partition vào file dữ liệu
+    query_support = support_df \
+        .writeStream \
+        .outputMode("append") \
+        .format("parquet")\
+        .option("path","hdfs://namenode:9000/raw_support/")\
+        .option("checkpointLocation", "hdfs://namenode:9000/check-point-support-logs/")\
+        .partitionBy("year","month","day") \
+        .start()
 
-    # stop_signal_df = df.filter(col("topic") == "stop-signal-topic") \
-    #                 .selectExpr("CAST(value AS STRING) as stop_signal")
-    
-    # # Ghi tín hiệu dừng vào memory sink
-    # stop_signal_query = stop_signal_df.writeStream \
-    #     .outputMode("append") \
-    #     .format("memory") \
-    #     .queryName("stop_signal_mem_query") \
-    #     .start()
-    
-    # def check_stop_signal():
-    #     while query.isActive:
-    #         time.sleep(5)
-    #         try:
-    #             stop_df = spark.sql("SELECT stop_signal FROM stop_signal_mem_query WHERE stop_signal = 'stop'")
-    #             if stop_df.count() > 0:
-    #                 print("Stop signal received. Will let Spark finish current batch...")
-    #                 # Không dừng đột ngột mà cho phép Spark kết thúc tự nhiên
-    #                 return
-    #         except Exception as e:
-    #             print("Error checking stop signal:", e)
-
-    # stop_thread = threading.Thread(target=check_stop_signal, daemon=True)
-    # stop_thread.start()
-
-    # Cho phép Spark Streaming tiếp tục chạy đến khi được yêu cầu dừng
-    query.awaitTermination()
-    print("STREAM_SUCCESS")
-    # stop_signal_query.awaitTermination()
-
+    print("Spark Streaming queries started for all sources...")
+    spark.streams.awaitAnyTermination()
 
 if __name__ == "__main__":
     stream_to_hdfs()

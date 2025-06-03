@@ -1,19 +1,13 @@
-FROM bitnami/kafka:latest
-USER root
+FROM python:3.11-slim-buster
 
+# Cài đặt các tiện ích cơ bản như 'tail' và 'sleep'
 RUN apt-get update \
-    && apt-get install -y python3 python3-pip python3-venv\
+    && apt-get install -y coreutils \
     && rm -rf /var/lib/apt/lists/*
 
-#create VM to install library
+WORKDIR /app
+
 RUN python3 -m venv /opt/vm \
-    && /opt/vm/bin/pip install confluent_kafka requests
+    && /opt/vm/bin/pip install --no-cache-dir requests pandas confluent_kafka
 
-ENV PATH="/opt/vm/bin:$PATH" 
-
-# USER 1001
-# WORKDIR /var/lib/kafka/
-
-# COPY producer.py .
-
-# CMD ["/opt/vm/bin/python" , "producer.py"]
+ENV PATH="/opt/vm/bin:$PATH"

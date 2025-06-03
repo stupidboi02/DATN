@@ -3,6 +3,7 @@
 import PropTypes from "prop-types"
 import { formatDate, formatCurrency } from "../utils/formatters"
 import MessageButton from "./MessageButton"
+import { Link } from "react-router-dom"
 
 function UserCard({ user, isExpanded, onToggleExpand }) {
     // Safe access to nested properties
@@ -182,6 +183,10 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
     const totalSpend = safeAccess(user, "total_spend", 0)
     const totalItemsPurchased = safeAccess(user, "total_items_purchased", 0)
 
+    // Support-related fields
+    const totalSupportInteractions = safeAccess(user, "total_support_interactions", "Chưa có yêu cầu")
+    const avgSatisfactionScore = safeAccess(user, "avg_satisfaction_score", "null")
+
     // Safely get timestamps
     const firstVisitTimestamp = safeAccess(user, "first_visit_timestamp", "")
     const lastVisitTimestamp = safeAccess(user, "last_visit_timestamp", "")
@@ -202,6 +207,20 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
                     <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold text-gray-800">User ID: {userId}</h3>
                         <MessageButton user={user} />
+                        <Link
+                            to={`/analytics/${userId}`}
+                            className="flex items-center px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5 mr-2"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                            </svg>
+                            Thống kê chi tiết
+                        </Link>
                         {(() => {
                             if (churnRisk === "Very High") {
                                 return (
@@ -272,7 +291,7 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
                 <div className="border-t border-gray-200 p-4 bg-gray-50">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <h4 className="font-medium text-gray-700 mb-2">Thông tin hoạt động</h4>
+                            <h4 className="font-bold text-gray-700 mb-2">Thông tin hoạt động</h4>
                             <ul className="space-y-2 text-sm">
                                 <li className="flex justify-between">
                                     <span className="text-gray-600">Lần ghé thăm đầu tiên:</span>
@@ -292,15 +311,23 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
                                     <span className="text-gray-600">Hoạt động gần nhất:</span>
                                     <span className="font-medium">{formatDate(lastActiveDate)}</span>
                                 </li>
+                                <h4 className="font-bold mb-2">Thông tin hỗ trợ</h4>
+                                <li className="flex justify-between">
+                                    <span className="text-gray-600">Số lần yêu cầu hỗ trợ:</span>
+                                    <span className="font-medium">{totalSupportInteractions}</span>
+                                </li>
+                                <li className="flex justify-between">
+                                    <span className="text-gray-600">Mức độ hài lòng:</span>
+                                    <span className="font-medium">{avgSatisfactionScore}</span>
+                                </li>
                             </ul>
                         </div>
 
                         <div>
-                            <h4 className="font-medium text-gray-700 mb-2">Lịch sử mua hàng</h4>
+                            <h4 className="font-bold text-gray-700 mb-2">Lịch sử mua hàng</h4>
                             {Array.isArray(purchaseHistory) && purchaseHistory.length > 0 ? (
                                 <div
-                                    className={`${purchaseHistory.length > 5 ? "purchase-history-scrollable" : "purchase-history-non-scrollable"
-                                        }`}
+                                    className={`${purchaseHistory.length > 5 ? "purchase-history-scrollable" : "purchase-history-non-scrollable"}`}
                                 >
                                     {purchaseHistory.map((purchase, index) => (
                                         <div key={purchase.order_id || index} className="bg-white p-3 rounded border border-gray-200">
@@ -341,7 +368,7 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
 
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <h4 className="font-medium text-gray-700 mb-2">Danh mục ưa thích</h4>
+                            <h4 className="font-bold text-gray-700 mb-2">Danh mục ưa thích</h4>
                             <div className="bg-white p-3 rounded border border-gray-200">
                                 {Object.entries(categoryPreferences).length > 0 ? (
                                     Object.entries(categoryPreferences).map(([category, score]) => (
@@ -367,7 +394,7 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
                         </div>
 
                         <div>
-                            <h4 className="font-medium text-gray-700 mb-2">Thương hiệu ưa thích</h4>
+                            <h4 className="font-bold text-gray-700 mb-2">Thương hiệu ưa thích</h4>
                             <div className="bg-white p-3 rounded border border-gray-200">
                                 {Object.entries(brandPreferences).length > 0 ? (
                                     Object.entries(brandPreferences).map(([brand, score]) => (

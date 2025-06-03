@@ -48,7 +48,7 @@ backend
 To run the FastAPI application, execute the following command:
 
 ```
-uvicorn src.main:app --reload
+uvicorn src.main:app --reload --port 8888
 ```
 
 The application will be available at `http://127.0.0.1:8000`.

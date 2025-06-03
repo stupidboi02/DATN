@@ -1,9 +1,13 @@
 spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 --master spark://spark-master:7077 /opt/airflow/code/extract.py
 
-spark-submit --master spark://spark-master:7077 --jars /opt/airflow/code/postgresql-42.2.5.jar /opt/airflow/code/transform.py
+spark-submit --master spark://spark-master:7077 --packages org.postgresql:postgresql:42.2.5 /opt/airflow/code/daily_metrics.py
 
-spark-submit --master spark://spark-master:7077 /opt/airflow/code/profile_user.py
-spark-submit --master spark://spark-master:7077 /opt/airflow/code/test.py
+docker exec -it spark-worker-1 /bin/bash
+
+spark-submit --master spark://spark-master:7077 /opt/airflow/code/transform_event.py
+spark-submit --master spark://spark-master:7077 /opt/airflow/code/transform_support.py
+
+spark-submit --packages org.mongodb.spark:mongo-spark-connector_2.12:10.5.0 --master spark://spark-master:7077 /opt/airflow/code/recommendation/predict.py
 
 spark-submit --packages org.mongodb.spark:mongo-spark-connector_2.12:10.5.0 --master spark://spark-master:7077 /opt/airflow/code/load.py
 

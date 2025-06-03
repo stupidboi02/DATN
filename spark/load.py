@@ -1,44 +1,44 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.types import TimestampType, DateType, DoubleType
 from datetime import datetime
 from pyspark.sql.functions import*
+from datetime import datetime
 import sys
-from pymongo import MongoClient
-import pymongo
-# def handle_none(value, default=[]):
-#         """
-#         Trả về giá trị hoặc giá trị mặc định nếu giá trị là None.
-#         """
-#         return value if value is not None else default
 
-# def transform_row_to_dict(row):
-#     return {
-#         "user_id": handle_none(row.user_id),
-#         "first_visit_timestamp": handle_none(row.first_visit_timestamp),
-#         "last_visit_timestamp": handle_none(row.last_visit_timestamp),
-#         "last_purchase_date": handle_none(row.last_purchase_date),
-#         "last_active_date": handle_none(row.last_active_date),
-#         "total_visits": handle_none(row.total_visits, 0),
-#         "purchase_history": [
-#             {
-#                 "order_id": ph.order_id,
-#                 "order_timestamp": ph.order_timestamp,
-#                 "total_amount": ph.total_amount,
-#                 "items": [
-#                     {"product_id": item.product_id, "quantity": item.quantity, "price": item.price}
-#                     for item in ph.items
-#                 ]
-#             }
-#             for ph in handle_none(row.purchase_history)
-#         ],
-#         "category_preferences":row.category_preferences,
-#         "brand_preferences":row.brand_preferences,
-#         "total_items_purchased": handle_none(row.total_items_purchased),
-#         "total_spend":handle_none(row.total_spend),
-#         "update_day":row.update_day,
-#         "segments":row.segments,
-#         "churn_risk":row.churn_risk
-#     }
-
+def load_to_mongo(df_event,df_support):
+    user_profile_df = (df_event.alias("event")).join((df_support).alias("support"),on="user_id",how="outer")
+    final_profile = user_profile_df.select(
+            col("user_id"),
+            # Coalesce các trường từ event-based profile (thường là nguồn chính)
+            coalesce(col("event.first_visit_timestamp"), lit(None).cast(TimestampType())).alias("first_visit_timestamp"),
+            coalesce(col("event.last_visit_timestamp"), lit(None).cast(TimestampType())).alias("last_visit_timestamp"),
+            coalesce(col("event.last_purchase_date"), lit(None).cast(TimestampType())).alias("last_purchase_date"),
+            coalesce(col("event.last_active_date"), lit(None).cast(TimestampType())).alias("last_active_date"),
+            coalesce(col("event.total_visits"), lit(0)).alias("total_visits"),
+            coalesce(col("event.purchase_history"), array()).alias("purchase_history"),
+            coalesce(col("event.category_preferences"), create_map()).alias("category_preferences"),
+            coalesce(col("event.brand_preferences"), create_map()).alias("brand_preferences"),
+            coalesce(col("event.churn_risk"),lit(None)).alias("churn_risk"),
+            coalesce(col("event.total_items_purchased"), lit(0)).alias("total_items_purchased"),
+            coalesce(col("event.total_spend"), lit(0.0)).alias("total_spend"),
+            coalesce(col("event.segments"), lit("General Audience")).alias("segments"),
+            coalesce(col("event.update_day"), lit(snapshot_date).cast(DateType())).alias("update_day"), # Cập nhật ngày snapshot
+            
+            # Coalesce các trường từ support-based profile
+            coalesce(col("support.total_support_interactions"), lit(0)).alias("total_support_interactions"),
+            coalesce(col("support.total_calls"), lit(0)).alias("total_calls"),
+            coalesce(col("support.total_chats"), lit(0)).alias("total_chats"),
+            coalesce(col("support.total_tickets"), lit(0)).alias("total_tickets"),
+            coalesce(col("support.last_support_interaction_time"), lit(None).cast(TimestampType())).alias("last_support_interaction_time"),
+            coalesce(col("support.avg_satisfaction_score"), lit(None).cast(DoubleType())).alias("avg_satisfaction_score"),
+            coalesce(col("support.most_frequent_issue_category"), create_map()).alias("most_frequent_issue_category"),
+            coalesce(col("support.support_prone_flag"), lit(False)).alias("support_prone_flag"),
+        
+            )
+    final_profile.write.format("mongodb") \
+                    .mode("overwrite") \
+                    .option("collection", "user_profile") \
+                    .save()
 if __name__ == "__main__":
     spark = SparkSession.builder\
         .appName("LoadToDWH")\
@@ -50,21 +50,8 @@ if __name__ == "__main__":
     snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
     year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
 
-    df = spark.read.parquet(f"hdfs://namenode:9000/staging/year={year}/month={month}/day={day}")
-    df.write.format("mongodb") \
-        .mode("overwrite") \
-        .option("collection", "user_profile") \
-        .save()
-    # data_to_insert = [transform_row_to_dict(row) for row in df.collect()]
+    df_event = spark.read.parquet(f"hdfs://namenode:9000/staging/event/year={year}/month={month}/day={day}")
+    df_support = spark.read.parquet(f"hdfs://namenode:9000/staging/support/year={year}/month={month}/day={day}")
 
-    # client = MongoClient("mongodb://admin:admin@mongo:27017/")
-    # db = client["admin"]
-    # collection = db["user_profile"]
-    # # Xóa toàn bộ dữ liệu trong collection trước khi ghi dữ liệu mới
-    # collection.delete_many({})
-    # collection.create_index([("user_id", pymongo.ASCENDING)], unique=True)
+    load_to_mongo(df_event,df_support)
 
-    # sorted(list(collection.index_information()))
-
-    # collection.insert_many(data_to_insert)
-    # client.close()

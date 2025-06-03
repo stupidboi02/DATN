@@ -1,13 +1,16 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
 from pydantic import BaseModel
-from .models import UserProfile, PaginatedUserProfiles
-from typing import List, Optional, Dict
+from pymongo import MongoClient
+from sqlalchemy import create_engine, Column, Integer, Date, Float, PrimaryKeyConstraint, func
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta,date
+from typing import List, Optional, Dict, Any
 import logging
 import time
+from .models import UserProfile, PaginatedUserProfiles, PyObjectId
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +22,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -36,7 +39,41 @@ except Exception as e:
 db = client["admin"]
 collection = db["user_profile"]
 
+# PostgreSQL connection
+DATABASE_URL = "postgresql+psycopg2://mydatabase:mydatabase@127.0.0.1:5432/mydatabase"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+logger.info("Ket noi thanh cong Postgre")
+
+# PostgreSQL model
+class UserAnalytics(Base):
+    __tablename__ = "daily_user_metrics"
+    user_id = Column(Integer, index=True)
+    date = Column(Date)
+    daily_total_event = Column(Float)
+    daily_total_visits = Column(Float)
+    daily_total_view = Column(Float)
+    daily_total_add_to_cart = Column(Float)
+    daily_total_purchase = Column(Float)
+    daily_total_spend = Column(Float)
+    
+    __table_args__ = (
+        PrimaryKeyConstraint('user_id', 'date', name='pk_user_date'),
+    )
 # Pydantic models
+class AnalyticsResponse(BaseModel):
+    user_id: int
+    date: date
+    daily_total_event: float
+    daily_total_visits: float
+    daily_total_view: float
+    daily_total_add_to_cart: float
+    daily_total_purchase: float
+    daily_total_spend: float
+
+    class Config:
+        from_attributes  = True
 
 class UserProfile(BaseModel):
     id: str
@@ -54,7 +91,8 @@ class UserProfile(BaseModel):
     churn_risk: str
     category_preferences: Optional[Dict]
     brand_preferences: Optional[Dict]
-
+    total_support_interactions: Optional[int] = None
+    avg_satisfaction_score: Optional[float] = None
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {
@@ -124,6 +162,8 @@ async def get_user_profiles(
             "churn_risk": 1,
             "category_preferences": 1,
             "brand_preferences": 1,
+            "total_support_interactions": 1,
+            "avg_satisfaction_score": 1,
             "_id": 1
         }
 
@@ -184,6 +224,8 @@ async def get_user_profile(user_id: int):
             "churn_risk": 1,
             "category_preferences": 1,
             "brand_preferences": 1,
+            "total_support_interactions": 1,
+            "avg_satisfaction_score": 1,
             "_id": 1
         }
         
@@ -201,6 +243,52 @@ async def get_user_profile(user_id: int):
     except Exception as e:
         logger.error(f"Error in get_user_profile: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch profile: {str(e)}")
+    
+# Updated endpoint: Get analytics data with custom date range
+@app.get("/analytics/{user_id}", response_model=List[AnalyticsResponse])
+async def get_analytics(
+    user_id: int,
+    start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format")
+):
+    # Validate input
+    if (start_date is not None and end_date is None) or (start_date is None and end_date is not None):
+        raise HTTPException(status_code=400, detail="Both start_date and end_date must be specified together or neither")
+
+    # Database session
+    db = SessionLocal()
+    try:
+        # Get the earliest date for the user if start_date is not provided
+        if start_date is None:
+            earliest_date = db.query(func.min(UserAnalytics.date)).filter(UserAnalytics.user_id == user_id).scalar()
+            if earliest_date is None:
+                raise HTTPException(status_code=404, detail="No data found for user")
+            start_date = earliest_date
+        # Use today as default end_date if not provided
+        end_date = end_date or date.today()
+
+        # Validate date range
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="start_date must be earlier than or equal to end_date")
+        if end_date > date.today():
+            raise HTTPException(status_code=400, detail="end_date cannot be in the future")
+
+        # Database query
+        results = db.query(UserAnalytics).filter(
+            UserAnalytics.user_id == user_id,
+            UserAnalytics.date >= start_date,
+            UserAnalytics.date <= end_date
+        ).order_by(UserAnalytics.date.asc()).all()
+        
+        if not results:
+            raise HTTPException(status_code=404, detail="No data found for user in the specified date range")
+        
+        return results
+    finally:
+        db.close()
+
+# Create database tables for PostgreSQL
+Base.metadata.create_all(bind=engine)
 
 if __name__ == "__main__":
     import uvicorn
