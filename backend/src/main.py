@@ -1,16 +1,16 @@
+import math
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from pymongo import MongoClient
-from sqlalchemy import create_engine, Column, Integer, Date, Float, PrimaryKeyConstraint, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine
 from bson import ObjectId
-from datetime import datetime, timedelta,date
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import logging
 import time
-from .models import UserProfile, PaginatedUserProfiles, PyObjectId
+from sqlalchemy import func
+from .models import Base, Segment, SegmentBase, SegmentResponse, SegmentRule, SegmentRuleBase, SegmentListResponse, UserSegmentMembership, UserProfile, PaginatedUserProfiles, UserAnalytics, AnalyticsResponse
+from datetime import date, datetime
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ app.add_middleware(
 # MongoDB connection
 try:
     client = MongoClient("mongodb://admin:admin@127.0.0.1:27017", serverSelectionTimeoutMS=5000)
-    client.server_info()  # Test connection
+    client.server_info()
     logger.info("Connected to MongoDB successfully")
 except Exception as e:
     logger.error(f"Failed to connect to MongoDB: {str(e)}")
@@ -43,197 +43,244 @@ collection = db["user_profile"]
 DATABASE_URL = "postgresql+psycopg2://mydatabase:mydatabase@127.0.0.1:5432/mydatabase"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-logger.info("Ket noi thanh cong Postgre")
+logger.info("Ket noi successful Postgre")
 
-# PostgreSQL model
-class UserAnalytics(Base):
-    __tablename__ = "daily_user_metrics"
-    user_id = Column(Integer, index=True)
-    date = Column(Date)
-    daily_total_event = Column(Float)
-    daily_total_visits = Column(Float)
-    daily_total_view = Column(Float)
-    daily_total_add_to_cart = Column(Float)
-    daily_total_purchase = Column(Float)
-    daily_total_spend = Column(Float)
-    
-    __table_args__ = (
-        PrimaryKeyConstraint('user_id', 'date', name='pk_user_date'),
-    )
-# Pydantic models
-class AnalyticsResponse(BaseModel):
-    user_id: int
-    date: date
-    daily_total_event: float
-    daily_total_visits: float
-    daily_total_view: float
-    daily_total_add_to_cart: float
-    daily_total_purchase: float
-    daily_total_spend: float
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-    class Config:
-        from_attributes  = True
-
-class UserProfile(BaseModel):
-    id: str
-    user_id: int
-    first_visit_timestamp: datetime
-    last_visit_timestamp: datetime
-    last_purchase_date: Optional[datetime] = None
-    last_active_date: datetime
-    total_visits: int
-    purchase_history: List
-    total_items_purchased: int
-    total_spend: int
-    update_day: datetime
-    segments: str
-    churn_risk: str
-    category_preferences: Optional[Dict]
-    brand_preferences: Optional[Dict]
-    total_support_interactions: Optional[int] = None
-    avg_satisfaction_score: Optional[float] = None
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {
-            ObjectId: str,
-            datetime: lambda v: v.isoformat()
+# Helper function to assign users to a segment based on rules
+def assign_users_to_segment(db: Session, segment_id: int, rules: List[SegmentRule], batch_size: int = 1000):
+    try:
+        logger.info(f"Assigning users to segment_id={segment_id}")
+        if not rules:
+            logger.info(f"No rules for segment_id={segment_id}, skipping assignment")
+            return
+        date_fields = {
+            "first_visit_timestamp",
+            "last_visit_timestamp",
+            "last_purchase_date",
+            "last_active_date",
+            "update_day",
+            "last_support_interaction_time"
         }
+        # 1. Chuyển rule thành query MongoDB
+        mongo_query = {}
+        for rule in rules:
+            try:            
+                if rule.field in date_fields:
+                    value = datetime.strptime(rule.value, "%Y-%m-%d")
+                else:
+                    value = float(rule.value)
+                if rule.operator == "=":
+                    mongo_query[rule.field] = value
+                elif rule.operator == ">=":
+                    mongo_query[rule.field] = {"$gte": value}
+                elif rule.operator == "<=":
+                    mongo_query[rule.field] = {"$lte": value}
+                elif rule.operator == ">":
+                    mongo_query[rule.field] = {"$gt": value}
+                elif rule.operator == "<":
+                    mongo_query[rule.field] = {"$lt": value}
+                elif rule.operator == "!=":
+                    mongo_query[rule.field] = {"$ne": value}
+            except ValueError:
+                logger.warning(f"Invalid rule value for field={rule.field}, value={rule.value}")
+                continue
 
-@app.get("/user-profiles", response_model=PaginatedUserProfiles)
+        # Clear existing memberships for this segment
+        db.query(UserSegmentMembership).filter(UserSegmentMembership.segment_id == segment_id).delete()
+        db.commit()
+
+        # Stream user_ids from MongoDB
+        cursor = collection.find(mongo_query, {"user_id": 1}).batch_size(batch_size)
+        user_ids_batch = []
+        total_assigned = 0
+
+        for user in cursor:
+            user_id = str(user["user_id"])
+            user_ids_batch.append(user_id)
+            if len(user_ids_batch) >= batch_size:
+                # Check for existing memberships
+                existing = set(
+                    r[0] for r in db.query(UserSegmentMembership.user_id)
+                    .filter(
+                        UserSegmentMembership.segment_id == segment_id,
+                        UserSegmentMembership.user_id.in_(user_ids_batch)
+                    ).all()
+                )
+                # Create new memberships
+                new_members = [
+                    UserSegmentMembership(user_id=uid, segment_id=segment_id)
+                    for uid in user_ids_batch if uid not in existing
+                ]
+                if new_members:
+                    db.bulk_save_objects(new_members)
+                    db.commit()
+                total_assigned += len(new_members)
+                user_ids_batch = []
+
+        # Process remaining batch
+        if user_ids_batch:
+            existing = set(
+                r[0] for r in db.query(UserSegmentMembership.user_id)
+                .filter(
+                    UserSegmentMembership.segment_id == segment_id,
+                    UserSegmentMembership.user_id.in_(user_ids_batch)
+                ).all()
+            )
+            new_members = [
+                UserSegmentMembership(user_id=uid, segment_id=segment_id)
+                for uid in user_ids_batch if uid not in existing
+            ]
+            if new_members:
+                db.bulk_save_objects(new_members)
+                db.commit()
+            total_assigned += len(new_members)
+
+        logger.info(f"Assigned {total_assigned} users to segment_id={segment_id}")
+    except Exception as e:
+        logger.error(f"Error assigning users to segment_id={segment_id}: {str(e)}")
+        db.rollback()
+        raise
+
+@app.get("/user-profiles")
 async def get_user_profiles(
-    page: int = Query(1, ge=1, description="Page number (1-based)"),
-    size: int = Query(10, ge=1, le=100, description="Number of records per page"),
-    user_id: Optional[int] = Query(None, description="Filter by exact user ID"),
-    min_total_visits: Optional[int] = Query(None, ge=0, description="Minimum total visits"),
-    max_total_visits: Optional[int] = Query(None, ge=0, description="Maximum total visits"),
-    min_total_spend: Optional[int] = Query(None, ge=0, description="Minimum total spend"),
-    max_total_spend: Optional[int] = Query(None, ge=0, description="Maximum total spend"),
-    min_total_items_purchased: Optional[int] = Query(None, ge=0, description="Minimum total items purchased"),
-    max_total_items_purchased: Optional[int] = Query(None, ge=0, description="Maximum total items purchased"),
-    segments: Optional[str] = Query(None, description="Filter by exact segments value"),
-    churn_risk: Optional[str] = Query(None, description="Filter by exact churn risk value")
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    segment_id: Optional[List[int]] = Query(None, description="Filter by segment IDs"),
+    db: Session = Depends(get_db)
 ):
     try:
         start_time = time.time()
-        logger.info(f"Fetching user profiles: page={page}, size={size}, filters={{user_id={user_id}, total_visits=({min_total_visits},{max_total_visits}), total_spend=({min_total_spend},{max_total_spend}), total_items_purchased=({min_total_items_purchased},{max_total_items_purchased}), segments={segments}, churn_risk={churn_risk}}}")
-
-        # Build MongoDB query
-        query = {}
-        if user_id is not None:
-            query["user_id"] = user_id
-        if min_total_visits is not None or max_total_visits is not None:
-            query["total_visits"] = {}
-            if min_total_visits is not None:
-                query["total_visits"]["$gte"] = min_total_visits
-            if max_total_visits is not None:
-                query["total_visits"]["$lte"] = max_total_visits
-        if min_total_spend is not None or max_total_spend is not None:
-            query["total_spend"] = {}
-            if min_total_spend is not None:
-                query["total_spend"]["$gte"] = min_total_spend
-            if max_total_spend is not None:
-                query["total_spend"]["$lte"] = max_total_spend
-        if min_total_items_purchased is not None or max_total_items_purchased is not None:
-            query["total_items_purchased"] = {}
-            if min_total_items_purchased is not None:
-                query["total_items_purchased"]["$gte"] = min_total_items_purchased
-            if max_total_items_purchased is not None:
-                query["total_items_purchased"]["$lte"] = max_total_items_purchased
-        if segments is not None:
-            query["segments"] = segments
-        if churn_risk is not None:
-            query["churn_risk"] = churn_risk
+        logger.info(f"Fetching user profiles: page={page}, size={size}, segment_id={segment_id}")
 
         skip = (page - 1) * size
-
         projection = {
-            "user_id": 1,
-            "first_visit_timestamp": 1,
-            "last_visit_timestamp": 1,
-            "last_purchase_date": 1,
-            "last_active_date": 1,
-            "total_visits": 1,
-            "purchase_history": 1,
-            "total_items_purchased": 1,
-            "total_spend": 1,
-            "update_day": 1,
-            "segments": 1,
-            "churn_risk": 1,
-            "category_preferences": 1,
-            "brand_preferences": 1,
-            "total_support_interactions": 1,
-            "avg_satisfaction_score": 1,
-            "_id": 1
+            "user_id": 1, "first_visit_timestamp": 1, "last_visit_timestamp": 1,
+            "last_purchase_date": 1, "last_active_date": 1, "total_visits": 1,
+            "purchase_history": 1, "total_items_purchased": 1, "total_spend": 1,
+            "update_day": 1, "segments": 1, "churn_risk": 1,
+            "category_preferences": 1, "brand_preferences": 1,
+            "total_support_interactions": 1, "avg_satisfaction_score": 1, "_id": 1
         }
 
-        totalSize = collection.count_documents(query)
-        totalPage = (totalSize + size - 1) // size
-
         profiles = []
-        try:
-            cursor = collection.find(query, projection).skip(skip).limit(size)
+        totalSize = 0
+        totalPage = 0
+
+        if segment_id:
+            memberships_query = db.query(UserSegmentMembership.user_id).filter(
+                UserSegmentMembership.segment_id.in_(segment_id)
+            )
+            totalSize = memberships_query.count()
+            user_ids = [int(m[0]) for m in memberships_query.offset(skip).limit(size).all() if str(m[0]).isdigit()]
+            totalPage = (totalSize + size - 1) // size
+
+            if user_ids:
+                # Lấy mapping user_id -> tất cả segment_id mà user thuộc về
+                memberships = db.query(UserSegmentMembership.user_id, UserSegmentMembership.segment_id).filter(
+                    UserSegmentMembership.user_id.in_(user_ids)
+                ).all()
+                user_segments_map = {}
+                for uid, segid in memberships:
+                    user_segments_map.setdefault(int(uid), []).append(segid)
+
+                query = {"user_id": {"$in": user_ids}}
+                cursor = collection.find(query, projection)
+                for profile in cursor:
+                    try:
+                        profile["id"] = str(profile["_id"])
+                        del profile["_id"]
+                        # Gán segments_list cho từng user
+                        profile["segments_list"] = user_segments_map.get(profile["user_id"], [])
+                        for k, v in profile.items():
+                            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                                profile[k] = None
+                        user_profile = UserProfile(**profile)
+                        profiles.append(user_profile.model_dump())
+                    except Exception as e:
+                        logger.error(f"Error processing profile {profile.get('user_id')}: {str(e)}")
+                        continue
+        else:
+            # Nếu không truyền segment_id, trả về toàn bộ user (phân trang trên MongoDB)
+            totalSize = collection.count_documents({})
+            totalPage = (totalSize + size - 1) // size
+            cursor = collection.find({}, projection).skip(skip).limit(size)
+            # Lấy user_id của trang hiện tại
+            user_ids_in_page = []
+            profiles_temp = []
             for profile in cursor:
                 try:
                     profile["id"] = str(profile["_id"])
                     del profile["_id"]
-                    user_profile = UserProfile(**profile)
-                    profiles.append(user_profile.model_dump())  # <-- Sửa dòng này
+                    user_ids_in_page.append(profile["user_id"])
+                    profiles_temp.append(profile)
                 except Exception as e:
                     logger.error(f"Error processing profile {profile.get('user_id')}: {str(e)}")
                     continue
-        except Exception as e:
-            logger.error(f"Error executing MongoDB query: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"MongoDB query failed: {str(e)}")
+            # Lấy mapping user_id -> tất cả segment_id mà user thuộc về
+            user_segments_map = {}
+            if user_ids_in_page:
+                memberships = db.query(UserSegmentMembership.user_id, UserSegmentMembership.segment_id).filter(
+                    UserSegmentMembership.user_id.in_(user_ids_in_page)
+                ).all()
+                for uid, segid in memberships:
+                    user_segments_map.setdefault(int(uid), []).append(segid)
+            # Gán segments_list cho từng user
+            for profile in profiles_temp:
+                profile["segments_list"] = user_segments_map.get(profile["user_id"], [])
+                # Convert all NaN/Infinity values to None for JSON compliance
+                for k, v in profile.items():
+                    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                        profile[k] = None
+                user_profile = UserProfile(**profile)
+                profiles.append(user_profile.model_dump())
 
         execution_time = time.time() - start_time
         logger.info(f"Successfully fetched {len(profiles)} profiles in {execution_time:.3f} seconds")
         if not profiles:
             logger.warning("No profiles found matching the criteria")
-
         return PaginatedUserProfiles(
-            page=page,
-            size=size,
-            totalPage=totalPage,
-            totalSize=totalSize,
-            data=profiles  # <-- Bây giờ là list các dict
+            page=page, size=size, totalPage=totalPage, totalSize=totalSize, data=profiles
         )
     except Exception as e:
         logger.error(f"Error in get_user_profiles: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch profiles: {str(e)}")
 
-@app.get("/user-profile/{user_id}", response_model=UserProfile)
-async def get_user_profile(user_id: int):
+@app.get("/user-profile/{user_id}")
+async def get_user_profile(user_id: int, db: Session = Depends(get_db)):
     try:
         start_time = time.time()
         logger.info(f"Fetching profile for user_id: {user_id}")
-        
-        # Define projection
         projection = {
-            "user_id": 1,
-            "first_visit_timestamp": 1,
-            "last_visit_timestamp": 1,
-            "last_purchase_date": 1,
-            "last_active_date": 1,
-            "total_visits": 1,
-            "purchase_history": 1,
-            "total_items_purchased": 1,
-            "total_spend": 1,
-            "update_day": 1,
-            "segments": 1,
-            "churn_risk": 1,
-            "category_preferences": 1,
-            "brand_preferences": 1,
-            "total_support_interactions": 1,
-            "avg_satisfaction_score": 1,
-            "_id": 1
+            "user_id": 1, "first_visit_timestamp": 1, "last_visit_timestamp": 1,
+            "last_purchase_date": 1, "last_active_date": 1, "total_visits": 1,
+            "purchase_history": 1, "total_items_purchased": 1, "total_spend": 1,
+            "update_day": 1, "segments": 1, "churn_risk": 1,
+            "category_preferences": 1, "brand_preferences": 1,
+            "total_support_interactions": 1, "avg_satisfaction_score": 1, "_id": 1
         }
-        
         profile = collection.find_one({"user_id": user_id}, projection)
         if profile:
             profile["id"] = str(profile["_id"])
             del profile["_id"]
-            # Validate with Pydantic explicitly
+
+            # --- Đồng bộ segments_list từ bảng user_segment_membership ---
+            memberships = db.query(UserSegmentMembership.segment_id).filter(
+                UserSegmentMembership.user_id == user_id
+            ).all()
+            profile["segments_list"] = [segid for (segid,) in memberships]
+
+            # Convert all NaN/Infinity values to None for JSON compliance
+            for k, v in profile.items():
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    profile[k] = None
+
             user_profile = UserProfile(**profile)
             execution_time = time.time() - start_time
             logger.info(f"Successfully fetched profile for user_id: {user_id} in {execution_time:.3f} seconds")
@@ -243,51 +290,210 @@ async def get_user_profile(user_id: int):
     except Exception as e:
         logger.error(f"Error in get_user_profile: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch profile: {str(e)}")
-    
-# Updated endpoint: Get analytics data with custom date range
+
 @app.get("/analytics/{user_id}", response_model=List[AnalyticsResponse])
 async def get_analytics(
     user_id: int,
     start_date: Optional[date] = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format")
+    end_date: Optional[date] = Query(None, description="End date in YYYY-MM-DD format"),
+    db: Session = Depends(get_db)
 ):
-    # Validate input
-    if (start_date is not None and end_date is None) or (start_date is None and end_date is not None):
-        raise HTTPException(status_code=400, detail="Both start_date and end_date must be specified together or neither")
-
-    # Database session
-    db = SessionLocal()
     try:
-        # Get the earliest date for the user if start_date is not provided
+        if (start_date is not None and end_date is None) or (start_date is None and end_date is not None):
+            raise HTTPException(status_code=400, detail="Both start_date and end_date must be specified together or neither")
         if start_date is None:
             earliest_date = db.query(func.min(UserAnalytics.date)).filter(UserAnalytics.user_id == user_id).scalar()
             if earliest_date is None:
                 raise HTTPException(status_code=404, detail="No data found for user")
             start_date = earliest_date
-        # Use today as default end_date if not provided
         end_date = end_date or date.today()
-
-        # Validate date range
         if start_date > end_date:
             raise HTTPException(status_code=400, detail="start_date must be earlier than or equal to end_date")
         if end_date > date.today():
             raise HTTPException(status_code=400, detail="end_date cannot be in the future")
-
-        # Database query
         results = db.query(UserAnalytics).filter(
             UserAnalytics.user_id == user_id,
             UserAnalytics.date >= start_date,
             UserAnalytics.date <= end_date
         ).order_by(UserAnalytics.date.asc()).all()
-        
         if not results:
             raise HTTPException(status_code=404, detail="No data found for user in the specified date range")
-        
         return results
     finally:
         db.close()
 
-# Create database tables for PostgreSQL
+
+@app.get("/segments/list", response_model=List[SegmentListResponse])
+async def get_segment_list(db: Session = Depends(get_db)):
+    try:
+        logger.info("Fetching segment list")
+        segments = db.query(Segment).all()
+        return segments
+    except Exception as e:
+        logger.error(f"Error fetching segment list: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch segment list: {str(e)}")
+
+@app.get("/segments/{segment_id}", response_model=SegmentResponse)
+async def get_segment(segment_id: int, db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Fetching segment: {segment_id}")
+        segment = db.query(Segment).filter(Segment.segment_id == segment_id).first()
+        if not segment:
+            raise HTTPException(status_code=404, detail="Segment not found")
+        
+        rules = db.query(SegmentRule).filter(SegmentRule.segment_id == segment_id).all()
+        response = SegmentResponse(
+            segment_id=segment.segment_id,
+            segment_name=segment.segment_name,
+            description=segment.description,
+            is_active=segment.is_active,
+            created_at=segment.created_at,
+            rules=[SegmentRuleBase(**rule.__dict__) for rule in rules]
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error fetching segment {segment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch segment: {str(e)}")
+
+# Segment Management Endpoints
+@app.post("/segments", response_model=SegmentResponse)
+async def create_segment(segment: SegmentBase, db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Creating segment: {segment.segment_name}")
+        # Check if segment_name exists
+        existing_segment = db.query(Segment).filter(Segment.segment_name == segment.segment_name).first()
+        if existing_segment:
+            raise HTTPException(status_code=400, detail=f"Segment '{segment.segment_name}' already exists")
+        
+        # Create segment
+        db_segment = Segment(
+            segment_name=segment.segment_name,
+            description=segment.description,
+            is_active=segment.is_active
+        )
+        db.add(db_segment)
+        db.commit()
+        db.refresh(db_segment)
+
+        # Create rules
+        list_rules=[]
+        for rule in segment.rules or []:
+            db_rule = SegmentRule(
+                segment_id=db_segment.segment_id,
+                field=rule.field,
+                operator=rule.operator,
+                value=rule.value,
+                logic=rule.logic
+            )
+            db.add(db_rule)
+            list_rules.append(db_rule)
+        db.commit()
+
+        assign_users_to_segment(db, db_segment.segment_id, list_rules)
+
+        # Fetch rules for response
+        rules = db.query(SegmentRule).filter(SegmentRule.segment_id == db_segment.segment_id).all()
+        response = SegmentResponse(
+            segment_id=db_segment.segment_id,
+            segment_name=db_segment.segment_name,
+            description=db_segment.description,
+            is_active=db_segment.is_active,
+            created_at=db_segment.created_at,
+            rules=[SegmentRuleBase(**rule.__dict__) for rule in rules]
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error creating segment: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create segment: {str(e)}")
+    
+@app.put("/segments/{segment_id}", response_model=SegmentResponse)
+async def update_segment(segment_id: int, segment: SegmentBase, db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Updating segment: {segment_id}")
+        db_segment = db.query(Segment).filter(Segment.segment_id == segment_id).first()
+        if not db_segment:
+            raise HTTPException(status_code=404, detail="Segment not found")
+
+        # Check if segment_name is taken by another segment
+        existing_segment = db.query(Segment).filter(
+            Segment.segment_name == segment.segment_name,
+            Segment.segment_id != segment_id
+        ).first()
+        if existing_segment:
+            raise HTTPException(status_code=400, detail=f"Segment name '{segment.segment_name}' already exists")
+
+        # Validate rules
+        for rule in segment.rules or []:
+            if not rule.field or not rule.operator or not rule.value:
+                raise HTTPException(status_code=422, detail="All rule fields (field, operator, value) must be non-empty")
+
+        # Update segment
+        db_segment.segment_name = segment.segment_name
+        db_segment.description = segment.description
+        db_segment.is_active = segment.is_active
+
+        # Delete existing rules
+        db.query(SegmentRule).filter(SegmentRule.segment_id == segment_id).delete()
+
+        # Create new rules
+        new_rules = []
+        for rule in segment.rules or []:
+            db_rule = SegmentRule(
+                segment_id=segment_id,
+                field=rule.field,
+                operator=rule.operator,
+                value=rule.value,
+                logic=rule.logic
+            )
+            db.add(db_rule)
+            new_rules.append(db_rule)
+
+        db.commit()
+        db.refresh(db_segment)
+
+        # --- Gán lại user vào segment dựa trên rule mới ---
+        assign_users_to_segment(db, segment_id, new_rules)
+        
+        # Fetch updated rules for response
+        rules = db.query(SegmentRule).filter(SegmentRule.segment_id == segment_id).all()
+
+        response = SegmentResponse(
+            segment_id=db_segment.segment_id,
+            segment_name=db_segment.segment_name,
+            description=db_segment.description,
+            is_active=db_segment.is_active,
+            created_at=db_segment.created_at,
+            rules=[SegmentRuleBase(**rule.__dict__) for rule in rules]
+        )
+        return response
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error updating segment: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update segment: {str(e)}")
+
+@app.delete("/segments/{segment_id}")
+async def delete_segment(segment_id: int, db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Attempting to delete segment with ID: {segment_id}")
+        db_segment = db.query(Segment).filter(Segment.segment_id == segment_id).first()
+        if not db_segment:
+            logger.warning(f"Segment with ID {segment_id} not found")
+            raise HTTPException(status_code=404, detail="Segment not found")
+
+        # Delete the segment (related SegmentRule and UserSegmentMembership records should be deleted via CASCADE)
+        db.delete(db_segment)
+        db.commit()
+        logger.info(f"Successfully deleted segment with ID: {segment_id}")
+        return {"detail": "Segment deleted successfully"}
+    except Exception as e:
+        logger.error(f"Error deleting segment with ID {segment_id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete segment: {str(e)}")
+
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
 if __name__ == "__main__":

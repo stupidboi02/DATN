@@ -4,7 +4,7 @@ import { useState } from "react"
 import PropTypes from "prop-types"
 import UserCard from "./UserCard"
 
-function UserDataList({ userData }) {
+function UserDataList({ userData, segmentNameMap }) {
     const [expandedUser, setExpandedUser] = useState(null)
 
     const toggleExpand = (userId) => {
@@ -31,6 +31,7 @@ function UserDataList({ userData }) {
                     user={user}
                     isExpanded={expandedUser === user._id}
                     onToggleExpand={() => toggleExpand(user._id)}
+                    segmentNameMap={segmentNameMap}
                 />
             ))}
         </div>
@@ -39,6 +40,7 @@ function UserDataList({ userData }) {
 
 UserDataList.propTypes = {
     userData: PropTypes.array.isRequired,
+    segmentNameMap: PropTypes.object.isRequired,
 }
 
 export default UserDataList

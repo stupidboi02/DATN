@@ -30,45 +30,16 @@ function MessageModal({ isOpen, onClose, onSend, selectedUsers, isBatchMessage, 
         try {
             // Build query parameters from filters
             const params = new URLSearchParams()
-
-            if (filters.userId) {
-                params.append("user_id", filters.userId)
-            }
-            if (filters.totalVisitsMin) {
-                params.append("min_total_visits", filters.totalVisitsMin)
-            }
-            if (filters.totalVisitsMax) {
-                params.append("max_total_visits", filters.totalVisitsMax)
-            }
-            if (filters.totalSpendMin) {
-                params.append("min_total_spend", filters.totalSpendMin)
-            }
-            if (filters.totalSpendMax) {
-                params.append("max_total_spend", filters.totalSpendMax)
-            }
-            if (filters.totalItemsMin) {
-                params.append("min_total_items_purchased", filters.totalItemsMin)
-            }
-            if (filters.totalItemsMax) {
-                params.append("max_total_items_purchased", filters.totalItemsMax)
-            }
             if (filters.segMents) {
                 params.append("segments", filters.segMents)
             }
-            if (filters.churnRisk) {
-                params.append("churn_risk", filters.churnRisk)
-            }
-
             // Set page size to 1 just to get total count
             params.append("page", 1)
             params.append("size", 1)
-
-            const response = await fetch(`http://127.0.0.1:8000/user-profiles?${params.toString()}`)
-
+            const response = await fetch(`http://localhost:8888/user-profiles?${params.toString()}`)
             if (!response.ok) {
                 throw new Error(`API error: ${response.status}`)
             }
-
             const data = await response.json()
             setPreviewCount(data.totalSize || 0)
         } catch (err) {
@@ -95,14 +66,7 @@ function MessageModal({ isOpen, onClose, onSend, selectedUsers, isBatchMessage, 
                 // Convert filters to the format expected by the API
                 const apiFilters = {
                     user_ids: filters.userId ? [Number.parseInt(filters.userId)] : undefined,
-                    min_total_visits: filters.totalVisitsMin ? Number.parseInt(filters.totalVisitsMin) : undefined,
-                    max_total_visits: filters.totalVisitsMax ? Number.parseInt(filters.totalVisitsMax) : undefined,
-                    min_total_spend: filters.totalSpendMin ? Number.parseInt(filters.totalSpendMin) : undefined,
-                    max_total_spend: filters.totalSpendMax ? Number.parseInt(filters.totalSpendMax) : undefined,
-                    min_total_items_purchased: filters.totalItemsMin ? Number.parseInt(filters.totalItemsMin) : undefined,
-                    max_total_items_purchased: filters.totalItemsMax ? Number.parseInt(filters.totalItemsMax) : undefined,
                     segments: filters.segMents || undefined,
-                    churn_risk: filters.churnRisk || undefined,
                 }
 
                 result = await onSend({

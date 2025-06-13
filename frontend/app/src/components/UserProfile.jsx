@@ -7,16 +7,7 @@ import MessageButton from "./MessageButton"
 
 function UserProfile() {
     const [filters, setFilters] = useState({
-        userId: "",
-        totalVisitsMin: "",
-        totalVisitsMax: "",
-        totalSpendMin: "",
-        totalSpendMax: "",
-        totalSpendSort: "",
-        totalItemsMin: "",
-        totalItemsMax: "",
-        segMents: "",
-        churnRisk: "",
+        segMents: [],
     })
     const [userData, setUserData] = useState([])
     const [totalUsers, setTotalUsers] = useState(0)
@@ -26,64 +17,63 @@ function UserProfile() {
         page: 1,
         size: 10,
     })
+    const [segmentNameMap, setSegmentNameMap] = useState({})
+
+    useEffect(() => {
+        // Chỉ gọi 1 lần khi component mount
+        const fetchSegments = async () => {
+            try {
+                const res = await fetch("http://localhost:8888/segments/list");
+                if (!res.ok) throw new Error(`API segment error: ${res.status}`);
+                const segment_data = await res.json();
+                const validSegments = segment_data.filter(segment => segment.segment_id != null);
+                // Create segment ID to name map
+                const nameMap = validSegments.reduce((map, segment) => ({
+                    ...map,
+                    [segment.segment_id]: segment.segment_name,
+                }), {});
+                setSegmentNameMap(nameMap);
+            } catch (err) {
+                console.error("Error fetching segments:", err);
+            }
+        };
+        fetchSegments();
+    }, []);
+
 
     const fetchData = useCallback(async () => {
         setLoading(true)
         setError(null)
-
         try {
-            const params = new URLSearchParams()
-            params.append("page", pagination.page)
-            params.append("size", pagination.size)
-
-            if (filters.userId) {
-                params.append("user_id", filters.userId)
-            }
-            if (filters.totalVisitsMin) {
-                params.append("min_total_visits", filters.totalVisitsMin)
-            }
-            if (filters.totalVisitsMax) {
-                params.append("max_total_visits", filters.totalVisitsMax)
-            }
-            if (filters.totalSpendMin) {
-                params.append("min_total_spend", filters.totalSpendMin)
-            }
-            if (filters.totalSpendMax) {
-                params.append("max_total_spend", filters.totalSpendMax)
-            }
-            if (filters.totalSpendSort) {
-                params.append("sort_by", "total_spend")
-                params.append("sort_order", filters.totalSpendSort)
-            }
-            if (filters.totalItemsMin) {
-                params.append("min_total_items_purchased", filters.totalItemsMin)
-            }
-            if (filters.totalItemsMax) {
-                params.append("max_total_items_purchased", filters.totalItemsMax)
-            }
-            if (filters.segMents) {
-                params.append("segments", filters.segMents)
-            }
-            if (filters.churnRisk) {
-                params.append("churn_risk", filters.churnRisk)
-            }
-
-            const response = await fetch(`http://127.0.0.1:8888/user-profiles?${params.toString()}`)
-
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`)
-            }
-
-            const data = await response.json()
-
-            if (Array.isArray(data)) {
-                setUserData(data)
-                setTotalUsers(data.length)
-            } else if (data && typeof data === "object") {
-                setUserData(data.data || [])
-                setTotalUsers(data?.totalSize || data?.data?.length || 0)
+            if (filters.userId && filters.userId.trim() !== "") {
+                // Nếu có userId, gọi API lấy 1 user cụ thể
+                const response = await fetch(`http://localhost:8888/user-profile/${filters.userId.trim()}`)
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        setUserData([])
+                        setTotalUsers(0)
+                        setError("Không tìm thấy user với ID này.")
+                        return
+                    }
+                    throw new Error(`API user-profile error: ${response.status}`)
+                }
+                const data = await response.json()
+                setUserData(data ? [data] : [])
+                setTotalUsers(data ? 1 : 0)
             } else {
-                throw new Error("Unexpected API response format")
+                const params = new URLSearchParams()
+                params.append("page", pagination.page)
+                params.append("size", pagination.size)
+                if (filters.segMents && filters.segMents.length > 0) {
+                    filters.segMents.forEach(segmentId => params.append("segment_id", segmentId))
+                }
+                const response = await fetch(`http://localhost:8888/user-profiles?${params.toString()}`)
+                if (!response.ok) {
+                    throw new Error(`API user-profiles error: ${response.status}`)
+                }
+                const data = await response.json()
+                setUserData(data.data || [])
+                setTotalUsers(data.totalSize || 0)
             }
         } catch (err) {
             console.error("Error fetching data:", err)
@@ -175,7 +165,7 @@ function UserProfile() {
                             </div>
                         ) : (
                             <>
-                                <UserDataList userData={userData} />
+                                <UserDataList userData={userData} segmentNameMap={segmentNameMap} />
                                 <Pagination
                                     currentPage={pagination.page}
                                     pageSize={pagination.size}

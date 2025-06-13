@@ -41,7 +41,6 @@ def transform_support_data(df):
     return result
 
 if __name__ == "__main__":
-    # ngày truyền vào
     snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
     # bắt đầu từ ngày 1
     start_date = snapshot_date.replace(day=1)

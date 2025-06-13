@@ -6,6 +6,7 @@ import UserProfile from "./components/UserProfile"
 import Dashboard from "./components/Dashboard"
 import GetDataPage from "./components/GetDataPage"
 import AnalyticsPage from "./components/AnalyticsPage"
+import SegmentPage from "./components/SegmentPage"
 import "./App.css"
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/user-profile" element={<UserProfile />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/get-data" element={<GetDataPage />} />
+        <Route path="/manage-segment" element={<SegmentPage />} />
         <Route path="/analytics/:userId" element={<AnalyticsPage />} />
       </Routes>
     </Router>

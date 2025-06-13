@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import TimestampType, DateType, DoubleType
+from pyspark.sql.types import TimestampType, DateType, DoubleType, IntegerType
 from datetime import datetime
 from pyspark.sql.functions import*
 from datetime import datetime
@@ -8,7 +8,7 @@ import sys
 def load_to_mongo(df_event,df_support):
     user_profile_df = (df_event.alias("event")).join((df_support).alias("support"),on="user_id",how="outer")
     final_profile = user_profile_df.select(
-            col("user_id"),
+            col("user_id").cast(IntegerType()).alias("user_id"),
             # Coalesce các trường từ event-based profile (thường là nguồn chính)
             coalesce(col("event.first_visit_timestamp"), lit(None).cast(TimestampType())).alias("first_visit_timestamp"),
             coalesce(col("event.last_visit_timestamp"), lit(None).cast(TimestampType())).alias("last_visit_timestamp"),

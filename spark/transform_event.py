@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import sys
 
 user_profile_schema = StructType([
-    StructField("user_id", StringType(), False),
+    StructField("user_id", IntegerType(), False),
     StructField("first_visit_timestamp", TimestampType(), True),
     StructField("last_visit_timestamp", TimestampType(), True),
     StructField("last_purchase_date", TimestampType(), True),
@@ -23,10 +23,10 @@ user_profile_schema = StructType([
     ])), True),
     StructField("category_preferences", MapType(StringType(), FloatType()), True),
     StructField("brand_preferences", MapType(StringType(), FloatType()), True),
-    StructField("churn_risk",StringType(), True),
     StructField("total_items_purchased", IntegerType(), True),
     StructField("total_spend", DoubleType(), True),
     StructField("segments", StringType(), True),
+    StructField("churn_risk",StringType(), True),
     StructField("update_day", DateType(), True)
 ])
 
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         spark.sparkContext.setLogLevel("ERROR")
 
         snapshot_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
-        #today path to transform
+
         year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
 
         logs_day_path = f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}"

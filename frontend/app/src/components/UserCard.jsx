@@ -5,7 +5,7 @@ import { formatDate, formatCurrency } from "../utils/formatters"
 import MessageButton from "./MessageButton"
 import { Link } from "react-router-dom"
 
-function UserCard({ user, isExpanded, onToggleExpand }) {
+function UserCard({ user, isExpanded, onToggleExpand, segmentNameMap }) {
     // Safe access to nested properties
     const safeAccess = (obj, path, defaultValue = "") => {
         try {
@@ -199,6 +199,7 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
     // Safely get preferences
     const categoryPreferences = safeAccess(user, "category_preferences", {})
     const brandPreferences = safeAccess(user, "brand_preferences", {})
+    const userSegmentNames = user.segments_list?.map(id => segmentNameMap[id] || "Unknown").join(", ") || "Chưa định nghĩa"
 
     return (
         <div className="bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300">
@@ -255,7 +256,8 @@ function UserCard({ user, isExpanded, onToggleExpand }) {
                             }
                         })()}
                     </div>
-                    <p className="text-gray-500 text-sm">Phân khúc: {segments}</p>
+                    <p className="text-gray-500 text-sm">Phân khúc mặc định: {segments}</p>
+                    <p className=" text-sm">Phân khúc định nghĩa: {userSegmentNames}</p>
                 </div>
 
                 <div className="flex items-center gap-6">
@@ -429,6 +431,7 @@ UserCard.propTypes = {
     user: PropTypes.object.isRequired,
     isExpanded: PropTypes.bool.isRequired,
     onToggleExpand: PropTypes.func.isRequired,
+    segmentNameMap: PropTypes.object.isRequired,
 }
 
 export default UserCard
