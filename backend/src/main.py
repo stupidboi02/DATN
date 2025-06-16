@@ -4,13 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
-from bson import ObjectId
 from typing import List, Optional
 import logging
 import time
 from sqlalchemy import func
 from .models import Base, Segment, SegmentBase, SegmentResponse, SegmentRule, SegmentRuleBase, SegmentListResponse, UserSegmentMembership, UserProfile, PaginatedUserProfiles, UserAnalytics, AnalyticsResponse
 from datetime import date, datetime
+from sqlalchemy.orm import Session
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -53,8 +55,60 @@ def get_db():
     finally:
         db.close()
 
+# Khởi tạo scheduler
+# scheduler = AsyncIOScheduler()
+
+# async def update_all_segments(db: Session):
+#     logger.info("Running scheduled segment update")
+#     try:
+#         active_segments = db.query(Segment).filter(Segment.is_active == True).all()
+#         for segment in active_segments:
+#             rules = db.query(SegmentRule).filter(SegmentRule.segment_id == segment.segment_id).all()
+#             assign_users_to_segment(db, segment.segment_id, rules)
+#         logger.info("Completed segment update")
+#     except Exception as e:
+#         logger.error(f"Error updating segments: {str(e)}")
+
+# Start scheduler when app starts
+# @app.on_event("startup")
+# async def startup_event():
+#     db = next(get_db())  # Get a database session
+#     scheduler.add_job(update_all_segments, trigger=CronTrigger(hour=18, minute=0),args=[db], id='daily_segment_update', replace_existing=True)  # Run every 60 minutes
+#     scheduler.start()
+#     logger.info("Scheduler started")
+
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     logger.info("shutdowning Scheduler...")
+#     scheduler.shutdown()
+#     logger.info("Scheduler shutdown.")
+
+# @app.get("/scheduler/jobs")
+# async def list_jobs():
+#     """List all scheduled jobs."""
+#     jobs = scheduler.get_jobs()
+#     return [
+#         {
+#             "id": job.id,
+#             "name": job.name,
+#             "func": str(job.func),
+#             "trigger": str(job.trigger),
+#             "next_run_time": str(job.next_run_time)
+#         }
+#         for job in jobs
+#     ]
+
 # Helper function to assign users to a segment based on rules
 def assign_users_to_segment(db: Session, segment_id: int, rules: List[SegmentRule], batch_size: int = 1000):
+    # check if segment is not active => return
+    segment = db.query(Segment).filter(Segment.segment_id == segment_id).first()
+    if not segment:
+        logger.error(f"Segment with ID {segment_id} not found")
+        raise HTTPException(status_code=404, detail="Segment not found")
+    if not segment.is_active:
+        logger.info(f"Segment_id={segment_id} is not active, skipping user assignment")
+        return
+    
     try:
         logger.info(f"Assigning users to segment_id={segment_id}")
         if not rules:
@@ -389,7 +443,11 @@ async def create_segment(segment: SegmentBase, db: Session = Depends(get_db)):
             list_rules.append(db_rule)
         db.commit()
 
-        assign_users_to_segment(db, db_segment.segment_id, list_rules)
+        # check status active
+        if db_segment.is_active:
+            assign_users_to_segment(db, db_segment.segment_id, list_rules)
+        else:
+            logger.info(f"Segment_id={db_segment.segment_id} is not active, skipping user assignment")
 
         # Fetch rules for response
         rules = db.query(SegmentRule).filter(SegmentRule.segment_id == db_segment.segment_id).all()
@@ -453,8 +511,14 @@ async def update_segment(segment_id: int, segment: SegmentBase, db: Session = De
         db.refresh(db_segment)
 
         # --- Gán lại user vào segment dựa trên rule mới ---
-        assign_users_to_segment(db, segment_id, new_rules)
-        
+        # nếu active thì gán, không thì xóa
+        if db_segment.is_active:
+            assign_users_to_segment(db, segment_id, new_rules)
+        else:
+            logger.info(f"Segment_id={segment_id} is not active, clearing user assignments")
+            db.query(UserSegmentMembership).filter(UserSegmentMembership.segment_id == segment_id).delete()
+            db.commit()
+            
         # Fetch updated rules for response
         rules = db.query(SegmentRule).filter(SegmentRule.segment_id == segment_id).all()
 

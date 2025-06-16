@@ -2,16 +2,18 @@ from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.models.param import Param
+from datetime import timedelta
 default_args={
         "depends_on_past": False,
         "email": ["airflow@example.com"],
         "email_on_failure": False,
         "email_on_retry": False,
+        'execution_timeout': timedelta(hours=1),
         }
 with DAG(
     "ingest_data",
     default_args = default_args,
-    description ="ingest data pipeline",
+    description ="ingest data to pipeline",
     catchup=False,
     tags=["kafka"],
     params={
@@ -19,7 +21,7 @@ with DAG(
     }
 ) as dag:
     kafka_task = BashOperator(
-        task_id = "stream_to_broker",
+        task_id = "stream_to_kafka",
         bash_command = "python3 /var/lib/producer.py '{{ params.snapshot_date }}'"
     )
     write_stream = SparkSubmitOperator(

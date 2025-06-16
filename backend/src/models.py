@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import GetCoreSchemaHandler
 from pydantic import GetJsonSchemaHandler
-from pydantic import PlainSerializer
 from pydantic_core import core_schema
 from sqlalchemy import  Column, Integer, Date, DateTime, Float, PrimaryKeyConstraint, Boolean, func, Text, String, ForeignKey
 from datetime import datetime, date

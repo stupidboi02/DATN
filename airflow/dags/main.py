@@ -25,16 +25,33 @@ with DAG(
     }
 ) as dag:
 
-    process_profile = SparkSubmitOperator(
-        task_id="process_profile",
-        application="/opt/airflow/code/profile_user.py",
+    transform_event_logs = SparkSubmitOperator(
+        task_id="transform_event_logs",
+        application="/opt/airflow/code/transform_event.py",
         conn_id="spark_default",
         application_args=["{{ params.snapshot_date }}"],
         dag=dag
     )
 
-    load_to_mongo = SparkSubmitOperator(
-        task_id="load_to_mongo",
+    transform_support_logs = SparkSubmitOperator(
+        task_id="transform_support_logs",
+        application="/opt/airflow/code/transform_support.py",
+        conn_id="spark_default",
+        application_args=["{{ params.snapshot_date }}"],
+        dag=dag
+    )
+
+    daily_user_metrics = SparkSubmitOperator(
+        task_id="daily_user_metrics",
+        application="/opt/airflow/code/daily_metrics.py",
+        conn_id="spark_default",
+        application_args=["{{ params.snapshot_date }}"],
+        packages="org.postgresql:postgresql:42.2.5",
+        dag=dag
+    )
+
+    load_to_db = SparkSubmitOperator(
+        task_id="load_to_db",
         application="/opt/airflow/code/load.py",
         conn_id="spark_default",
         application_args=["{{ params.snapshot_date }}"],
@@ -43,4 +60,4 @@ with DAG(
         dag=dag
     )
 
-    process_profile >> load_to_mongo
+    [transform_event_logs, transform_support_logs, daily_user_metrics] >> load_to_db

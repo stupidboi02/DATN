@@ -1,17 +1,13 @@
-from flask import Flask, jsonify, request
-import duckdb
 
-app = Flask(__name__)
-
-# def create_duckdb(year,month):
-#     duckdb_file = f"./data/{year}-{month}.duckdb"
-#     file_path = f"./data/{year}-{month}.csv"
-#     con = duckdb.connect(duckdb_file)
-#     con.execute(f"CREATE TABLE IF NOT EXISTS logs AS SELECT * FROM read_csv('{file_path}')")
-#     con.execute("CREATE SEQUENCE serial START 1")
-#     con.execute("ALTER TABLE logs ADD COLUMN id BIGINT DEFAULT nextval('serial')")
-#     con.execute("CHECKPOINT")
-#     con.close()
+def create_duckdb(year,month):
+    duckdb_file = f"./data/{year}-{month}.duckdb"
+    file_path = f"./data/{year}-{month}.csv"
+    con = duckdb.connect(duckdb_file)
+    con.execute(f"CREATE TABLE IF NOT EXISTS logs AS SELECT * FROM read_csv('{file_path}')")
+    con.execute("CREATE SEQUENCE serial START 1")
+    con.execute("ALTER TABLE logs ADD COLUMN id BIGINT DEFAULT nextval('serial')")
+    con.execute("CHECKPOINT")
+    con.close()
 
 previous_request={
                 "year":None,
@@ -20,6 +16,11 @@ previous_request={
                 "total_rows": 0,
                 "base_id":0
                 }
+
+from flask import Flask, jsonify, request
+import duckdb
+
+app = Flask(__name__)
 
 @app.route("/get-data", methods=['GET'])
 def get_data():
@@ -30,7 +31,6 @@ def get_data():
     offset = request.args.get('offset')
     limit = request.args.get('limit')
 
-    # Kiểm tra month hợp lệ
     if not month:
         return jsonify({"error": "Invalid month"}), 400
     
@@ -45,7 +45,6 @@ def get_data():
         
         year,month,day = int(year),int(month),int(day)
 
-        #kiểm tra nếu cùng 1 ngày thì không đếm lại số bản ghi
         if(year != previous_request['year'] 
            or month != previous_request['month'] 
            or day != previous_request['day']):    
@@ -72,7 +71,7 @@ def get_data():
         else:
             total_rows = previous_request.get("total_rows")
             base_id = previous_request.get("base_id")
-        #sử dụng beetween để loại bỏ các ngày trước đó thay vì phải duyệt lại từ đầu nếu sử dụng "=="
+
         query = f"""
                 SELECT event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
                 FROM logs 
@@ -81,10 +80,9 @@ def get_data():
                 ORDER BY id
                 LIMIT {limit}
                 """
-        data = con.execute(query).fetchdf() #execute trả về 1 cursor -> cần fetch để lấy data
+        data = con.execute(query).fetchdf()
         data['event_time'] = data['event_time'].dt.strftime("%Y-%m-%d %H:%M:%S")
         
-
         con.close()
 
         if offset >= total_rows:
@@ -95,12 +93,8 @@ def get_data():
     except Exception as e:
         import traceback
         print(f"Error: {e}")
-        traceback.print_exc() #in ra chi tiết lỗi
+        traceback.print_exc() 
         return jsonify({"state": "error", "data": str(e)}), 500
-    
-@app.route("/")
-def check():
-    return '<p>Server is running</p>'
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

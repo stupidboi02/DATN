@@ -9,7 +9,6 @@ def load_to_mongo(df_event,df_support):
     user_profile_df = (df_event.alias("event")).join((df_support).alias("support"),on="user_id",how="outer")
     final_profile = user_profile_df.select(
             col("user_id").cast(IntegerType()).alias("user_id"),
-            # Coalesce các trường từ event-based profile (thường là nguồn chính)
             coalesce(col("event.first_visit_timestamp"), lit(None).cast(TimestampType())).alias("first_visit_timestamp"),
             coalesce(col("event.last_visit_timestamp"), lit(None).cast(TimestampType())).alias("last_visit_timestamp"),
             coalesce(col("event.last_purchase_date"), lit(None).cast(TimestampType())).alias("last_purchase_date"),
@@ -22,9 +21,8 @@ def load_to_mongo(df_event,df_support):
             coalesce(col("event.total_items_purchased"), lit(0)).alias("total_items_purchased"),
             coalesce(col("event.total_spend"), lit(0.0)).alias("total_spend"),
             coalesce(col("event.segments"), lit("General Audience")).alias("segments"),
-            coalesce(col("event.update_day"), lit(snapshot_date).cast(DateType())).alias("update_day"), # Cập nhật ngày snapshot
+            coalesce(col("event.update_day"), lit(snapshot_date).cast(DateType())).alias("update_day"),
             
-            # Coalesce các trường từ support-based profile
             coalesce(col("support.total_support_interactions"), lit(0)).alias("total_support_interactions"),
             coalesce(col("support.total_calls"), lit(0)).alias("total_calls"),
             coalesce(col("support.total_chats"), lit(0)).alias("total_chats"),

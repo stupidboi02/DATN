@@ -3,3 +3,4 @@ pymongo
 uvicorn
 sqlalchemy
 psycopg2
+apscheduler[asyncio]

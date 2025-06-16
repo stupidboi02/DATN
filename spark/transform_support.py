@@ -30,7 +30,6 @@ def transform_support_data(df):
     ).withColumn("support_prone_flag",
             when(col("total_support_interactions") > 5, True).otherwise(False)
 )
-    # Loại vấn đề hay gặp
     df_issue = df.groupBy("user_id", "issue_category").agg(count("*").alias("fre"))
     window = Window.partitionBy("user_id").orderBy(col("fre").desc())
     df_issue = df_issue.withColumn("top", row_number().over(window)) \
@@ -57,7 +56,7 @@ if __name__ == "__main__":
     res = transform_support_data(df)
     res.write.mode("overwrite").parquet(f"hdfs://namenode:9000/staging/support/year={year}/month={month}/day={day}")
    
-    # for month in [10]:
+    # for month in [11]:
     #     for day in range(1,32):
     #         snapshot_date=datetime.strptime(f"2019-{month}-{day}", "%Y-%m-%d").date()
     #         start_date = snapshot_date.replace(day=1)

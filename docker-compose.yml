@@ -18,6 +18,7 @@ x-airflow-common: &airflow-common
     - airflow_plugins:/opt/airflow/plugins
     - airflow_scripts:/opt/airflow/scripts
     - ./spark:/opt/airflow/code
+    - ./kafka:/var/lib
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
   depends_on:
     postgres:
@@ -344,21 +345,7 @@ services:
       - final-pro
     depends_on:
       - mongo
-  # superset:
-  #   build:
-  #     context: ./superset
-  #     dockerfile: dockerfile
-  #   container_name: superset
-  #   environment:
-  #     - ADMIN_USERNAME=admin
-  #     - ADMIN_EMAIL=admin@admin.com
-  #     - ADMIN_PASSWORD=admin
-  #   ports:
-  #     - '8088:8088'
-  #   networks:
-  #     - final-pro
-  #   volumes:
-  #     - superset:/app/home
+      
 networks:
   final-pro:
 

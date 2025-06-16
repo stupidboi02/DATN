@@ -63,7 +63,7 @@ def stream_to_hdfs():
         .option("checkpointLocation", "hdfs://namenode:9000/check-point-tmp/")\
         .partitionBy("year", "month", "day") \
         .start()
-    #spark sẽ không lưu các cột partition vào file dữ liệu
+
     query_support = support_df \
         .writeStream \
         .outputMode("append") \

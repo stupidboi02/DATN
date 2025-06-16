@@ -100,7 +100,7 @@ def compute_total_items_purchased(df_logs):
        return df
 
 def transform(snapshot_date, df_logs):
-    #previous path profile
+
     prev_snapshot = snapshot_date - timedelta(1)
     y, m, d = prev_snapshot.year, str(prev_snapshot.month).zfill(2), str(prev_snapshot.day).zfill(2)
     user_profile_pre = f"hdfs://namenode:9000/staging/event/year={y}/month={m}/day={d}"
@@ -221,17 +221,17 @@ if __name__ == "__main__":
         df_logs = spark.read.parquet(logs_day_path)
 
         transform(snapshot_date,df_logs)
+        # for x in range(1,32):
+        #     snapshot_date = datetime.strptime(f"2019-11-{x}", "%Y-%m-%d").date()
 
-        # for month in [10,11]:
-        #     for day in range(1,32):
-        #         snapshot_date = datetime.strptime(f"2019-{month}-{day}", "%Y-%m-%d").date()
-        #         year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
+        #     year, month, day = snapshot_date.year, str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
 
-        #         logs_day_path = f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}"
+        #     logs_day_path = f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}"
 
-        #         df_logs = spark.read.parquet(logs_day_path)
+        #     df_logs = spark.read.parquet(logs_day_path)
 
-        #         transform(snapshot_date,df_logs)
+        #     transform(snapshot_date,df_logs)
+
 
                
 

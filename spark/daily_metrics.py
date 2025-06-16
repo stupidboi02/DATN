@@ -7,7 +7,6 @@ daily_user_metrics_schema = StructType([
     StructField("user_id", IntegerType(), False), 
     StructField("date", DateType(), False),     
 
-    # --- Metrics từ Event Logs ---
     StructField("daily_total_visits", IntegerType(), True),
     StructField("daily_unique_product_views", IntegerType(), True),
     StructField("daily_total_add_to_cart", IntegerType(), True),
@@ -18,7 +17,6 @@ daily_user_metrics_schema = StructType([
     StructField("daily_brand_activity", MapType(StringType(), IntegerType()), True),  
     StructField("daily_active_session_count", IntegerType(), True),
 
-    # --- Metrics từ Customer Support Logs ---
     StructField("daily_support_interactions", IntegerType(), True),
     StructField("daily_calls", IntegerType(), True),
     StructField("daily_chats", IntegerType(), True),
@@ -52,15 +50,6 @@ def daily_user_metrics(event_logs,support_logs):
 
     result = result.withColumn("user_id", col("user_id").cast(LongType()))
     return result
-
-# def goods_stats(event_logs):
-#     e_df = event_logs.groupBy("product_id","brand","category_code",to_date("event_time").alias("date")).agg(
-#         count(when(col("event_type") == "view", True)).alias("daily_total_view"),
-#         count(when(col("event_type") == "cart", True)).alias("daily_total_add_to_cart"),
-#         count(when(col("event_type") == "purchase", True)).alias("daily_total_purchase"),
-#         countDistinct("user_id").alias("unique_user_count")
-#     )
-#     return e_df
     
 if __name__ == "__main__":
     spark = SparkSession.builder \
@@ -73,8 +62,8 @@ if __name__ == "__main__":
     # event_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}")
     # support_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_support/year={year}/month={month}/day={day}")
 
-    # daily_user_metrics = daily_user_metrics(event_logs,support_logs)
-    # daily_user_metrics.write.mode("append")\
+    # daily_user_metrics_df = daily_user_metrics(event_logs,support_logs)
+    # daily_user_metrics_df.write.mode("append")\
     #         .format('jdbc')\
     #         .option('url', 'jdbc:postgresql://data-warehouse:5432/mydatabase')\
     #         .option('dbtable',"daily_user_metrics")\
@@ -83,7 +72,7 @@ if __name__ == "__main__":
     #         .option('driver','org.postgresql.Driver')\
     #         .save()
     
-    for month in [10]:
+    for month in [11]:
         for day in range(3,32):
             snapshot_date = datetime.strptime(f"2019-{month}-{day}","%Y-%m-%d").date()
             year,month,day = snapshot_date.year,str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
