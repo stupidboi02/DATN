@@ -21,9 +21,9 @@ const SegmentPage = () => {
         { value: 'total_spend', label: 'Tổng tiền chi tiêu' },
         { value: 'total_visits', label: 'Tổng số lần hoạt động' },
         { value: 'total_items_purchased', label: 'Tổng đơn hàng đã mua' },
-        { value: 'first_visit_timestamp', label: 'Lần ghé thăm đầu tiên' },
-        { value: 'last_visit_timestamp', label: 'Lần ghé thăm gần nhất' },
-        { value: 'last_purchase_date', label: 'Lần mua hàng gần nhất' },
+        { value: 'first_visit_timestamp', label: 'Ngày hoạt động đầu tiên' },
+        { value: 'last_visit_timestamp', label: 'Ngày hoạt động gần nhất' },
+        { value: 'last_purchase_date', label: 'Ngày mua hàng gần nhất' },
         { value: 'total_support_interactions', label: 'Tổng số lần yêu cầu hỗ trợ' },
         { value: 'avg_satisfaction_score', label: 'Điểm hài lòng trung bình' },
     ];
@@ -60,6 +60,10 @@ const SegmentPage = () => {
             const [, field, idx] = name.split('_');
             const newRules = [...formData.rules];
             newRules[parseInt(idx)][field] = value;
+            // Ensure first rule's logic is always null
+            if (parseInt(idx) === 0 && field === 'logic') {
+                newRules[0].logic = null;
+            }
             setFormData((prev) => ({ ...prev, rules: newRules }));
         } else {
             setFormData((prev) => ({
@@ -101,6 +105,7 @@ const SegmentPage = () => {
                 setLoading(false);
                 return;
             }
+
         }
 
         try {
@@ -166,11 +171,11 @@ const SegmentPage = () => {
                 segmentName: data.segment_name,
                 description: data.description || '',
                 isActive: data.is_active,
-                rules: data.rules.map((rule) => ({
+                rules: data.rules.map((rule, index) => ({
                     field: rule.field,
                     operator: rule.operator,
                     value: rule.value,
-                    logic: rule.logic || null,
+                    logic: index === 0 ? null : rule.logic || 'AND',
                 })),
             });
             setIsEditing(true);

@@ -124,27 +124,53 @@ def assign_users_to_segment(db: Session, segment_id: int, rules: List[SegmentRul
         }
         # 1. Chuyển rule thành query MongoDB
         mongo_query = {}
+        or_conditions = []
         for rule in rules:
-            try:            
+            try:
                 if rule.field in date_fields:
                     value = datetime.strptime(rule.value, "%Y-%m-%d")
                 else:
                     value = float(rule.value)
+                # maping toán tử
+                operator_mapping = {}
                 if rule.operator == "=":
-                    mongo_query[rule.field] = value
+                    operator_mapping = {"$eq": value}
                 elif rule.operator == ">=":
-                    mongo_query[rule.field] = {"$gte": value}
+                    operator_mapping = {"$gte": value}
                 elif rule.operator == "<=":
-                    mongo_query[rule.field] = {"$lte": value}
+                    operator_mapping = {"$lte": value}
                 elif rule.operator == ">":
-                    mongo_query[rule.field] = {"$gt": value}
+                    operator_mapping = {"$gt": value}
                 elif rule.operator == "<":
-                    mongo_query[rule.field] = {"$lt": value}
+                    operator_mapping = {"$lt": value}
                 elif rule.operator == "!=":
-                    mongo_query[rule.field] = {"$ne": value}
+                    operator_mapping = {"$ne": value}
+                else:
+                    operator_mapping = None # Hoặc dictionary rỗng, hoặc raise lỗi
+
+                if operator_mapping is None:
+                    logger.warning(f"Invalid operator for rule field={rule.field}, operator={rule.operator}")
+                    continue
+
+                condition = {rule.field: operator_mapping}
+
+                # Apply logic: AND or OR
+                if rule.logic == "OR":
+                    or_conditions.append(condition)
+                else:  # Default to AND
+                    mongo_query.update(condition)
             except ValueError:
                 logger.warning(f"Invalid rule value for field={rule.field}, value={rule.value}")
                 continue
+
+        # Combine OR conditions if any
+        if or_conditions:
+            if mongo_query:
+                # Combine AND conditions with OR conditions
+                mongo_query = {"$and": [mongo_query, {"$or": or_conditions}]}
+            else:
+                # Only OR conditions
+                mongo_query = {"$or": or_conditions}
 
         # Clear existing memberships for this segment
         db.query(UserSegmentMembership).filter(UserSegmentMembership.segment_id == segment_id).delete()

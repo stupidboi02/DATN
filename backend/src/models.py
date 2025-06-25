@@ -61,6 +61,7 @@ class UserProfile(BaseModel):
         validate_by_name = True  # Thay cho allow_population_by_field_name
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
+
 class PaginatedUserProfiles(BaseModel):
     page: int
     size: int
@@ -121,6 +122,12 @@ class SegmentRuleBase(BaseModel):
     value: str
     logic: Optional[str] = None
 
+class SegmentRuleResponse(SegmentRuleBase):
+    rule_id: int
+    segment_id: int
+    class Config:
+        from_attributes = True
+
 class SegmentBase(BaseModel):
     segment_name: str
     description: Optional[str] = None
@@ -143,11 +150,6 @@ class SegmentListResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class SegmentRuleResponse(SegmentRuleBase):
-    rule_id: int
-    segment_id: int
-    class Config:
-        from_attributes = True
 
 # class UserSegmentMembershipBase(BaseModel):
 #     user_id: int

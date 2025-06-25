@@ -57,34 +57,34 @@ if __name__ == "__main__":
        .master("spark://spark-master:7077") \
        .getOrCreate()
 
-    # snapshot_date = datetime.strptime(sys.argv[1],"%Y-%m-%d").date()
-    # year,month,day = snapshot_date.year,str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
-    # event_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}")
-    # support_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_support/year={year}/month={month}/day={day}")
+    snapshot_date = datetime.strptime(sys.argv[1],"%Y-%m-%d").date()
+    year,month,day = snapshot_date.year,str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
+    event_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}")
+    support_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_support/year={year}/month={month}/day={day}")
 
-    # daily_user_metrics_df = daily_user_metrics(event_logs,support_logs)
-    # daily_user_metrics_df.write.mode("append")\
-    #         .format('jdbc')\
-    #         .option('url', 'jdbc:postgresql://data-warehouse:5432/mydatabase')\
-    #         .option('dbtable',"daily_user_metrics")\
-    #         .option('user','mydatabase')\
-    #         .option('password','mydatabase')\
-    #         .option('driver','org.postgresql.Driver')\
-    #         .save()
+    daily_user_metrics_df = daily_user_metrics(event_logs,support_logs)
+    daily_user_metrics_df.write.mode("append")\
+            .format('jdbc')\
+            .option('url', 'jdbc:postgresql://data-warehouse:5432/mydatabase')\
+            .option('dbtable',"daily_user_metrics")\
+            .option('user','mydatabase')\
+            .option('password','mydatabase')\
+            .option('driver','org.postgresql.Driver')\
+            .save()
     
-    for month in [11]:
-        for day in range(3,32):
-            snapshot_date = datetime.strptime(f"2019-{month}-{day}","%Y-%m-%d").date()
-            year,month,day = snapshot_date.year,str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
-            event_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}")
-            support_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_support/year={year}/month={month}/day={day}")
+    # for month in [11]:
+    #     for day in range(3,32):
+    #         snapshot_date = datetime.strptime(f"2019-{month}-{day}","%Y-%m-%d").date()
+    #         year,month,day = snapshot_date.year,str(snapshot_date.month).zfill(2), str(snapshot_date.day).zfill(2)
+    #         event_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_event/year={year}/month={month}/day={day}")
+    #         support_logs = spark.read.parquet(f"hdfs://namenode:9000/raw_support/year={year}/month={month}/day={day}")
 
-            daily_user_metrics_df = daily_user_metrics(event_logs,support_logs)
-            daily_user_metrics_df.write.mode("append")\
-                    .format('jdbc')\
-                    .option('url', 'jdbc:postgresql://data-warehouse:5432/mydatabase')\
-                    .option('dbtable',"daily_user_metrics")\
-                    .option('user','mydatabase')\
-                    .option('password','mydatabase')\
-                    .option('driver','org.postgresql.Driver')\
-                    .save()
+    #         daily_user_metrics_df = daily_user_metrics(event_logs,support_logs)
+    #         daily_user_metrics_df.write.mode("append")\
+    #                 .format('jdbc')\
+    #                 .option('url', 'jdbc:postgresql://data-warehouse:5432/mydatabase')\
+    #                 .option('dbtable',"daily_user_metrics")\
+    #                 .option('user','mydatabase')\
+    #                 .option('password','mydatabase')\
+    #                 .option('driver','org.postgresql.Driver')\
+    #                 .save()
