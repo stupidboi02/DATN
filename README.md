@@ -1,5 +1,6 @@
 # DATN
 Customer Data Platform
+
 **1. Tổng quan hệ thống**
 ![123123123](https://github.com/user-attachments/assets/cf557809-36f2-4f25-bde7-f4504181586f)
 
@@ -25,6 +26,7 @@ Customer Data Platform
     - Ứng dụng Web: quản lý hồ sơ, quản lý phân khúc
     
 **2. Kết quả**
+
 **   - Triển khai cụm Kafka**
    <img width="968" height="250" alt="image" src="https://github.com/user-attachments/assets/c986ad4f-b069-4bf1-9c50-2dffef2fbdf7" />
    
@@ -41,6 +43,7 @@ Customer Data Platform
      - Tổng quan: <img width="866" height="525" alt="image" src="https://github.com/user-attachments/assets/ee584aaf-a78d-4fde-b96e-c79d64882697" />
      - Chi tiết hồ sơ: <img width="688" height="545" alt="image" src="https://github.com/user-attachments/assets/0eb24c46-b764-4a7c-95ba-5ffcfe149310" />
      - Trực quan biểu đồ: <img width="897" height="603" alt="image" src="https://github.com/user-attachments/assets/16dc3240-65bf-4300-ab16-aed4aef6a4d1" />
+
 
 **    - Quản lý phân khúc**
        <img width="1019" height="354" alt="image" src="https://github.com/user-attachments/assets/3b1daa46-aac3-4c53-8669-ff32e468e665" />
