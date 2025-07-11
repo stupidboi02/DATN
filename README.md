@@ -40,18 +40,21 @@ Customer Data Platform
      <img width="1354" height="533" alt="image" src="https://github.com/user-attachments/assets/51b79599-c141-41ee-9088-1596ef29cb8c" />
      
 **   - Quản lý hồ sơ khách hàng**
+
      - Tổng quan hồ sơ: 
-     <img width="866" height="525" alt="image" src="https://github.com/user-attachments/assets/ee584aaf-a78d-4fde-b96e-c79d64882697" />
+   <img width="866" height="525" alt="image" src="https://github.com/user-attachments/assets/ee584aaf-a78d-4fde-b96e-c79d64882697" />
      
-     - Chi tiết hồ sơ: 
-     <img width="688" height="545" alt="image" src="https://github.com/user-attachments/assets/21b28c51-ed5d-46f8-a658-c3f5d71473ef" />
+     - Chi tiết hồ sơ:
+   <img width="688" height="545" alt="image" src="https://github.com/user-attachments/assets/21b28c51-ed5d-46f8-a658-c3f5d71473ef" />
 
      - Trực quan biểu đồ: 
-     <img width="897" height="603" alt="image" src="https://github.com/user-attachments/assets/857940e7-2e72-4631-9d0d-eb6246ba2bcd" />
+   <img width="897" height="603" alt="image" src="https://github.com/user-attachments/assets/857940e7-2e72-4631-9d0d-eb6246ba2bcd" />
 
 **    - Quản lý phân khúc**
-       <img width="1019" height="354" alt="image" src="https://github.com/user-attachments/assets/3b1daa46-aac3-4c53-8669-ff32e468e665" />
-       <img width="829" height="523" alt="image" src="https://github.com/user-attachments/assets/cf5b44a2-4281-452a-8289-ee0ebffd7cec" />
+
+   <img width="1019" height="354" alt="image" src="https://github.com/user-attachments/assets/3b1daa46-aac3-4c53-8669-ff32e468e665" />
+   
+   <img width="829" height="523" alt="image" src="https://github.com/user-attachments/assets/cf5b44a2-4281-452a-8289-ee0ebffd7cec" />
 
 
 
