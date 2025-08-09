@@ -158,20 +158,19 @@ flowchart LR
 - Airflow DAG quản lý toàn bộ pipeline:
     - Trigger Spark Streaming ingest data vào HDFS.
     - Trigger Spark Batch xử lý dữ liệu từ HDFS, transform và ghi kết quả vào PostgreSQL/MongoDB.
-- Dashboard ReactJS truy xuất dữ liệu từ các Database để trực quan hóa và quản lý.
-
+- Web Application FastApi + ReactJS truy xuất dữ liệu từ các Database để trực quan hóa và quản lý.
 ---
 
 ## 5. Công nghệ sử dụng
 
-| Thành phần      | Công nghệ                   |
+| Thành phần      | Công nghệ                  |
 |-----------------|----------------------------|
 | API nguồn       | Flask, Python              |
 | Streaming       | Apache Kafka, Spark        |
 | Lưu trữ         | HDFS, PostgreSQL, MongoDB  |
 | Xử lý ETL       | Apache Airflow             |
 | Triển khai      | Docker Compose             |
-| Dashboard       | ReactJS, Ant Design        |
+| Application     | ReactJS, FastAPI           |
 
 ---
 
