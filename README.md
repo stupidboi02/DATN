@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white"/>
 </p>
 
-<h1 align="center">DATN - Customer Data Platform</h1>
+<h1 align="center">DATN - Customer Segment Platform</h1>
 
 <p align="center"><strong>Hệ thống xử lý, phân tích dữ liệu khách hàng đa tầng, real-time, trực quan & quản lý phân khúc thông minh</strong></p>
 
