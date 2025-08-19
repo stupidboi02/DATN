@@ -36,7 +36,7 @@ function MessageModal({ isOpen, onClose, onSend, selectedUsers, isBatchMessage, 
             // Set page size to 1 just to get total count
             params.append("page", 1)
             params.append("size", 1)
-            const response = await fetch(`http://localhost:8888/user-profiles?${params.toString()}`)
+            const response = await fetch(`http://127.0.0.1:8888//user-profiles?${params.toString()}`)
             if (!response.ok) {
                 throw new Error(`API error: ${response.status}`)
             }

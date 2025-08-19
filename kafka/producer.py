@@ -1,5 +1,5 @@
 from confluent_kafka import Producer
-from confluent_kafka.admin import AdminClient, NewTopic
+from confluent_kafka.admin import AdminClient, NewTopic, ConfigResource, ConfigSource
 import json,requests, time, sys
 from datetime import datetime
 import pandas as pd
@@ -10,18 +10,18 @@ admin_client = AdminClient({'bootstrap.servers': 'kafka-0:9092,kafka-1:9092,kafk
 new_topic_stop = [
     NewTopic(
     topic="logs_data_11",
-    num_partitions=2,
-    replication_factor=1
+    num_partitions=3,
+    replication_factor=3,
     ),
     NewTopic(
     topic="logs_data_10",
-    num_partitions=2,
-    replication_factor=1
+    num_partitions=3,
+    replication_factor=3,
     ),
     NewTopic(
     topic="customer_support_logs",
-    num_partitions=2,
-    replication_factor=1
+    num_partitions=3,
+    replication_factor=3,
     )
 ]
 
@@ -29,6 +29,31 @@ try:
     admin_client.create_topics(new_topic_stop)
 except Exception as e:
     print(f"Error creating topics: {e}")
+
+# time.sleep(5)
+# topics_to_update_configs = ["logs_data_11", "logs_data_10", "customer_support_logs"]
+
+# for topic_name in topics_to_update_configs:
+#     # Thay vì ConfigSource.TOPIC_CONFIG, thử truyền số nguyên trực tiếp (đại diện cho Type.TOPIC)
+#     try:
+#         resource = ConfigResource(ConfigResource.Type.TOPIC, topic_name)
+#     except AttributeError:
+
+#         resource = ConfigResource(2, topic_name)
+
+#     new_configs = {'min.insync.replicas': '2'}
+
+#     try:
+#         fs = admin_client.alter_configs([resource], new_configs)
+#         for res, f in fs.items():
+#             try:
+#                 f.result()
+#                 print(f"Successfully updated 'min.insync.replicas' to 2 for topic '{topic_name}'")
+#             except Exception as e:
+#                 print(f"Failed to update 'min.insync.replicas' for topic '{topic_name}': {e}")
+#     except Exception as e:
+#         print(f"Error initiating config alteration for topic '{topic_name}': {e}")
+
 
 producer = Producer(config)
 url = "http://flask-service:5000/get-data"
@@ -59,7 +84,7 @@ def flush_event_logs(year,month,day):
                     value = json.dumps(record)
                     producer.produce(topic, value, key, callback=delivery_report)
                     producer.poll(0)        
-
+                    
                 if data['state'] == 'complete':
                     print("event logs stream complete")
                     time.sleep(3)
@@ -111,11 +136,12 @@ def flush_customer_support_logs(year,month,day):
     producer.flush()
 
 if __name__ == "__main__":
-    # date = datetime.strptime(sys.argv[1], "%Y-%m-%d")
-    # year, month, day = date.year, date.month, date.day
-    # flush_event_logs(year,month,day)
-    for x in range(1,32):
-        flush_event_logs(2019,11,x)
-        # flush_customer_support_logs(2019,11,x)
+    date = datetime.strptime(sys.argv[1], "%Y-%m-%d")
+    year, month, day = date.year, date.month, date.day
+    flush_event_logs(year,month,day)
+    flush_customer_support_logs(year,month,day)
+    # for x in range(1,32):
+    #     flush_event_logs(2019,11,x)
+    #     # flush_customer_support_logs(2019,11,x)
 
 

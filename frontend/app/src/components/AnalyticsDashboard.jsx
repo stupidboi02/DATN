@@ -28,7 +28,7 @@ const AnalyticsDashboard = ({ userId }) => {
         setLoading(true);
         setError(null);
         try {
-            let url = `http://localhost:8888/analytics/${userId}`;
+            let url = `http://127.0.0.1:8888/analytics/${userId}`;
             if (dateRange.length === 2) {
                 const startDate = dateRange[0].toISOString().split("T")[0];
                 const endDate = dateRange[1].toISOString().split("T")[0];

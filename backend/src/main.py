@@ -38,8 +38,8 @@ except Exception as e:
     logger.error(f"Failed to connect to MongoDB: {str(e)}")
     raise Exception(f"MongoDB connection failed: {str(e)}")
 
-db = client["admin"]
-collection = db["user_profile"]
+db_mongo = client["admin"]
+collection = db_mongo["user_profile"]
 
 # PostgreSQL connection
 DATABASE_URL = "postgresql+psycopg2://mydatabase:mydatabase@127.0.0.1:5432/mydatabase"
@@ -267,7 +267,7 @@ async def get_user_profiles(
                     UserSegmentMembership.user_id.in_(user_ids)
                 ).all()
                 user_segments_map = {}
-                for uid, segid in memberships:
+                for uid, segid in memberships: 
                     user_segments_map.setdefault(int(uid), []).append(segid)
 
                 query = {"user_id": {"$in": user_ids}}
@@ -319,7 +319,7 @@ async def get_user_profiles(
                     if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
                         profile[k] = None
                 user_profile = UserProfile(**profile)
-                profiles.append(user_profile.model_dump())
+                profiles.append(user_profile.model_dump()) # chuyển về json
 
         execution_time = time.time() - start_time
         logger.info(f"Successfully fetched {len(profiles)} profiles in {execution_time:.3f} seconds")

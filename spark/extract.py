@@ -36,7 +36,6 @@ def stream_to_hdfs():
         .format("kafka") \
         .option("kafka.bootstrap.servers", "kafka-0:9092,kafka-1:9092,kafka-2:9092")\
         .option("failOnDataLoss", "false") \
-        .option("includeHeaders", "true") \
         .option("subscribe", "logs_data_10, logs_data_11, customer_support_logs") \
         .load()
     

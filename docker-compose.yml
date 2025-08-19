@@ -1,7 +1,7 @@
 version: '3'
 
 x-airflow-common: &airflow-common
-  image: airflow
+  image: chickengang/airflow
   build:
     context: ./airflow
     dockerfile: dockerfile
@@ -201,7 +201,6 @@ services:
     command:
       [ "sh", "-c", "python -m flask --app app.py run --host=0.0.0.0 --reload && tail -f /dev/null" ]  
 # Other
-
   kafka-0:
     image: bitnami/kafka:3.7.0 
     container_name: kafka-0
@@ -223,11 +222,13 @@ services:
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=2
+      # Cấu hình MẶC ĐỊNH cho topic dữ liệu người dùng MỚI:
+      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=3      
+      - KAFKA_CFG_MIN_INSYNC_REPLICAS=2          
     volumes:
       - kafka_0_data:/bitnami/kafka/data
     networks:
       - final-pro
-
   kafka-1:
     image: bitnami/kafka:3.7.0 
     container_name: kafka-1
@@ -253,7 +254,6 @@ services:
       - kafka_1_data:/bitnami/kafka/data
     networks:
       - final-pro
-
   kafka-2:
     image: bitnami/kafka:3.7.0 
     container_name: kafka-2
@@ -279,8 +279,22 @@ services:
       - kafka_2_data:/bitnami/kafka/data
     networks:
       - final-pro
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8888:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local-kafka-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
+    networks:
+      - final-pro
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
   producer:
-    image: producer
+    image: producer:update
     container_name: producer
     volumes:
       - ./kafka:/app
@@ -301,7 +315,6 @@ services:
       - "5050:80"
     networks:
       - final-pro
-
   data-warehouse:
     image: postgres
     container_name: my-warehouse
@@ -315,7 +328,6 @@ services:
       - final-pro
     volumes:
       - data-warehouse:/var/lib/postgresql/data
-
   mongo:
     image: mongo
     container_name: my-mongodb

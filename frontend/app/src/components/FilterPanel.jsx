@@ -14,7 +14,7 @@ function FilterPanel({ filters, onFilterChange }) {
             setIsLoadingSegments(true)
             setSegmentError("")
             try {
-                const response = await fetch("http://localhost:8888/segments/list")
+                const response = await fetch("http://127.0.0.1:8888/segments/list")
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`)
                 }

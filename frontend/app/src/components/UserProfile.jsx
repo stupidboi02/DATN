@@ -23,7 +23,7 @@ function UserProfile() {
         // Chỉ gọi 1 lần khi component mount
         const fetchSegments = async () => {
             try {
-                const res = await fetch("http://localhost:8888/segments/list");
+                const res = await fetch("http://127.0.0.1:8888/segments/list");
                 if (!res.ok) throw new Error(`API segment error: ${res.status}`);
                 const segment_data = await res.json();
                 const validSegments = segment_data.filter(segment => segment.segment_id != null);
@@ -47,7 +47,7 @@ function UserProfile() {
         try {
             if (filters.userId && filters.userId.trim() !== "") {
                 // Nếu có userId, gọi API lấy 1 user cụ thể
-                const response = await fetch(`http://localhost:8888/user-profile/${filters.userId.trim()}`)
+                const response = await fetch(`http://127.0.0.1:8888/user-profile/${filters.userId.trim()}`)
                 if (!response.ok) {
                     if (response.status === 404) {
                         setUserData([])
@@ -67,7 +67,7 @@ function UserProfile() {
                 if (filters.segMents && filters.segMents.length > 0) {
                     filters.segMents.forEach(segmentId => params.append("segment_id", segmentId))
                 }
-                const response = await fetch(`http://localhost:8888/user-profiles?${params.toString()}`)
+                const response = await fetch(`http://127.0.0.1:8888/user-profiles?${params.toString()}`)
                 if (!response.ok) {
                     throw new Error(`API user-profiles error: ${response.status}`)
                 }

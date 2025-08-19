@@ -8,6 +8,6 @@ RUN apt-get update \
 WORKDIR /app
 
 RUN python3 -m venv /opt/vm \
-    && /opt/vm/bin/pip install --no-cache-dir requests pandas confluent_kafka
+    && /opt/vm/bin/pip install --no-cache-dir requests pandas confluent-kafka==2.11.0
 
 ENV PATH="/opt/vm/bin:$PATH"

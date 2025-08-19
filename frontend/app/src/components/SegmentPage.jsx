@@ -40,7 +40,7 @@ const SegmentPage = () => {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:8888/segments/list');
+            const response = await fetch('http://127.0.0.1:8888/segments/list');
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
@@ -123,13 +123,13 @@ const SegmentPage = () => {
 
             let response;
             if (isEditing) {
-                response = await fetch(`http://localhost:8888/segments/${formData.id}`, {
+                response = await fetch(`http://127.0.0.1:8888/segments/${formData.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
             } else {
-                response = await fetch('http://localhost:8888/segments', {
+                response = await fetch('http://127.0.0.1:8888/segments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
@@ -161,7 +161,7 @@ const SegmentPage = () => {
         try {
             setLoading(true);
             setError('');
-            const response = await fetch(`http://localhost:8888/segments/${segment.segment_id}`);
+            const response = await fetch(`http://127.0.0.1:8888/segments/${segment.segment_id}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch segment details. Status: ${response.status}`);
             }
@@ -199,7 +199,7 @@ const SegmentPage = () => {
         setSuccess('');
 
         try {
-            const response = await fetch(`http://localhost:8888/segments/${id}`, {
+            const response = await fetch(`http://127.0.0.1:8888/segments/${id}`, {
                 method: 'DELETE',
             });
 

@@ -31,7 +31,6 @@ def load_to_mongo(df_event,df_support):
             coalesce(col("support.avg_satisfaction_score"), lit(None).cast(DoubleType())).alias("avg_satisfaction_score"),
             coalesce(col("support.most_frequent_issue_category"), create_map()).alias("most_frequent_issue_category"),
             coalesce(col("support.support_prone_flag"), lit(False)).alias("support_prone_flag"),
-        
             )
     final_profile.write.format("mongodb") \
                     .mode("overwrite") \
