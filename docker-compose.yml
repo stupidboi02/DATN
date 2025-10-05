@@ -166,7 +166,6 @@ services:
       - final-pro
     volumes:
       - ./spark:/opt/airflow/code
-
   spark-worker-2:
     image: chickengang/spark:3.5.0
     container_name: spark-worker-2
